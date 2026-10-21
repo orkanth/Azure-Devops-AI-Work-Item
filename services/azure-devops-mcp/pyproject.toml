@@ -1,0 +1,14 @@
+[project]
+name = "azure-devops-mcp-server"
+version = "0.1.0"
+description = "FastMCP tools for Azure DevOps REST APIs"
+requires-python = ">=3.11"
+dependencies = [
+  "fastmcp",
+  "httpx",
+  "pydantic",
+  "pydantic-settings",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]

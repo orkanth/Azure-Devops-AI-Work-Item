@@ -1,0 +1,62 @@
+{
+  "name": "azure-devops-ai-work-item-generator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Prompt- and document-driven AI work-item management for Azure DevOps",
+  "engines": {
+    "node": "^20.19.0 || ^22.12.0 || ^24.0.0"
+  },
+  "scripts": {
+    "start": "npm run start:web",
+    "start:web": "nx serve web",
+    "start:api": "nest start api --watch",
+    "build": "npm run build:web && npm run build:api",
+    "build:web": "nx build web",
+    "build:api": "nest build api",
+    "start:ai": "cd services/ai-service && uv run uvicorn app.main:app --reload --port 8000",
+    "start:mcp": "cd services/azure-devops-mcp && uv run fastmcp run app.server:mcp",
+    "format": "prettier --write \"apps/**/*.{ts,html,css,json}\" \"docs/**/*.md\" \"*.json\"",
+    "format:check": "prettier --check \"apps/**/*.{ts,html,css,json}\" \"docs/**/*.md\" \"*.json\""
+  },
+  "dependencies": {
+    "@angular/animations": "20.3.34",
+    "@angular/common": "20.3.34",
+    "@angular/compiler": "20.3.34",
+    "@angular/core": "20.3.34",
+    "@angular/forms": "20.3.34",
+    "@angular/platform-browser": "20.3.34",
+    "@angular/router": "20.3.34",
+    "@nestjs/common": "^11.1.0",
+    "@nestjs/config": "^4.0.2",
+    "@nestjs/core": "^11.1.0",
+    "@nestjs/platform-express": "^11.1.0",
+    "@primeng/themes": "^20.0.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
+    "primeicons": "^7.0.0",
+    "primeng": "^20.0.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "~7.8.0",
+    "zone.js": "~0.15.1"
+  },
+  "devDependencies": {
+    "@angular-devkit/build-angular": "20.3.34",
+    "@angular-devkit/core": "20.3.34",
+    "@angular-devkit/schematics": "20.3.34",
+    "@angular/cli": "20.3.34",
+    "@angular/compiler-cli": "20.3.34",
+    "@nestjs/cli": "^11.0.10",
+    "@nestjs/schematics": "^11.0.9",
+    "@nestjs/testing": "^11.1.0",
+    "@nx/angular": "23.3.0",
+    "@nx/workspace": "23.3.0",
+    "@schematics/angular": "20.3.34",
+    "@tailwindcss/postcss": "^4.1.0",
+    "@types/node": "^22.15.0",
+    "nx": "23.3.0",
+    "postcss": "^8.5.3",
+    "prettier": "^3.6.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "~5.9.0"
+  }
+}

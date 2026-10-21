@@ -1,0 +1,21 @@
+{
+  "title": "User Management System",
+  "workItemType": "Epic",
+  "description": "Support secure user lifecycle management.",
+  "acceptanceCriteria": "",
+  "priority": 2,
+  "estimate": null,
+  "sourceReferences": ["TDD section 2.1"],
+  "children": [
+    {
+      "title": "Authentication and Access Control",
+      "workItemType": "Feature",
+      "description": "Support login and role-based access.",
+      "acceptanceCriteria": "",
+      "priority": 2,
+      "estimate": null,
+      "sourceReferences": ["TDD section 3.1"],
+      "children": []
+    }
+  ]
+}

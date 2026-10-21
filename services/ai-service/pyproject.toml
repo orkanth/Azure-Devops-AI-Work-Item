@@ -1,0 +1,19 @@
+[project]
+name = "azure-devops-ai-service"
+version = "0.1.0"
+description = "AI workflow and RAG service for Azure DevOps work item generation"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "pydantic",
+  "pydantic-settings",
+  "langchain",
+  "langgraph",
+  "chromadb",
+  "python-docx",
+  "pypdf",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "httpx", "ruff"]

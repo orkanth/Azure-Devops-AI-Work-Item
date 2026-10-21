@@ -1,0 +1,194 @@
+azure-devops-ai-work-item-generator/
+├── apps/
+│   ├── api/
+│   │   ├── src/
+│   │   │   ├── common/
+│   │   │   │   ├── filters/
+│   │   │   │   │   └── .gitkeep
+│   │   │   │   ├── guards/
+│   │   │   │   │   └── .gitkeep
+│   │   │   │   ├── interceptors/
+│   │   │   │   │   └── .gitkeep
+│   │   │   │   └── pipes/
+│   │   │   │       └── .gitkeep
+│   │   │   ├── config/
+│   │   │   │   └── .gitkeep
+│   │   │   ├── modules/
+│   │   │   │   ├── approvals/
+│   │   │   │   │   └── dto/
+│   │   │   │   │       └── .gitkeep
+│   │   │   │   ├── auth/
+│   │   │   │   │   └── dto/
+│   │   │   │   │       └── .gitkeep
+│   │   │   │   ├── azure-devops/
+│   │   │   │   │   └── dto/
+│   │   │   │   │       └── .gitkeep
+│   │   │   │   ├── documents/
+│   │   │   │   │   └── dto/
+│   │   │   │   │       └── .gitkeep
+│   │   │   │   ├── generation/
+│   │   │   │   │   └── dto/
+│   │   │   │   │       └── .gitkeep
+│   │   │   │   ├── health/
+│   │   │   │   │   ├── .gitkeep
+│   │   │   │   │   └── health.controller.ts
+│   │   │   │   └── users/
+│   │   │   │       └── dto/
+│   │   │   │           └── .gitkeep
+│   │   │   ├── app.module.ts
+│   │   │   └── main.ts
+│   │   ├── test/
+│   │   │   └── .gitkeep
+│   │   ├── README.md
+│   │   └── tsconfig.app.json
+│   └── web/
+│       ├── public/
+│       │   └── .gitkeep
+│       ├── src/
+│       │   ├── app/
+│       │   │   ├── core/
+│       │   │   │   ├── auth/
+│       │   │   │   │   └── .gitkeep
+│       │   │   │   ├── interceptors/
+│       │   │   │   │   └── .gitkeep
+│       │   │   │   └── services/
+│       │   │   │       ├── .gitkeep
+│       │   │   │       ├── mock-work-item.service.ts
+│       │   │   │       └── prompt-command.service.ts
+│       │   │   ├── features/
+│       │   │   │   ├── generator/
+│       │   │   │   │   ├── components/
+│       │   │   │   │   │   └── .gitkeep
+│       │   │   │   │   └── pages/
+│       │   │   │   │       └── .gitkeep
+│       │   │   │   ├── publish/
+│       │   │   │   │   ├── components/
+│       │   │   │   │   │   └── .gitkeep
+│       │   │   │   │   └── pages/
+│       │   │   │   │       └── .gitkeep
+│       │   │   │   └── review/
+│       │   │   │       ├── components/
+│       │   │   │       │   └── .gitkeep
+│       │   │   │       └── pages/
+│       │   │   │           └── .gitkeep
+│       │   │   ├── shared/
+│       │   │   │   ├── components/
+│       │   │   │   │   └── .gitkeep
+│       │   │   │   ├── models/
+│       │   │   │   │   ├── .gitkeep
+│       │   │   │   │   └── work-item.model.ts
+│       │   │   │   └── utils/
+│       │   │   │       └── .gitkeep
+│       │   │   ├── app.component.css
+│       │   │   ├── app.component.html
+│       │   │   ├── app.component.ts
+│       │   │   └── app.config.ts
+│       │   ├── assets/
+│       │   │   └── .gitkeep
+│       │   ├── environments/
+│       │   │   └── .gitkeep
+│       │   ├── index.html
+│       │   ├── main.ts
+│       │   └── styles.css
+│       ├── README.md
+│       └── tsconfig.app.json
+├── docs/
+│   ├── adr/
+│   │   ├── .gitkeep
+│   │   └── README.md
+│   ├── api/
+│   │   └── .gitkeep
+│   ├── architecture/
+│   │   ├── diagrams/
+│   │   │   └── .gitkeep
+│   │   └── README.md
+│   ├── development/
+│   │   └── .gitkeep
+│   ├── FUNCTIONAL-REQUIREMENTS.md
+│   ├── PROJECT-STRUCTURE.md
+│   ├── PROJECT-TREE.txt
+│   └── UI-PROTOTYPE.md
+├── infra/
+│   ├── docker/
+│   │   └── .gitkeep
+│   ├── scripts/
+│   │   └── .gitkeep
+│   └── README.md
+├── packages/
+│   └── contracts/
+│       ├── examples/
+│       │   ├── .gitkeep
+│       │   └── work-item-proposal.example.json
+│       ├── json-schemas/
+│       │   ├── .gitkeep
+│       │   └── work-item-proposal.schema.json
+│       └── README.md
+├── scripts/
+│   ├── .gitkeep
+│   └── README.md
+├── services/
+│   ├── ai-service/
+│   │   ├── app/
+│   │   │   ├── api/
+│   │   │   │   └── routes/
+│   │   │   │       └── .gitkeep
+│   │   │   ├── core/
+│   │   │   │   └── .gitkeep
+│   │   │   ├── graphs/
+│   │   │   │   ├── nodes/
+│   │   │   │   │   └── .gitkeep
+│   │   │   │   └── prompts/
+│   │   │   │       └── .gitkeep
+│   │   │   ├── llm/
+│   │   │   │   └── .gitkeep
+│   │   │   ├── rag/
+│   │   │   │   ├── ingestion/
+│   │   │   │   │   └── .gitkeep
+│   │   │   │   ├── retrieval/
+│   │   │   │   │   └── .gitkeep
+│   │   │   │   └── vectorstore/
+│   │   │   │       └── .gitkeep
+│   │   │   ├── schemas/
+│   │   │   │   └── .gitkeep
+│   │   │   ├── services/
+│   │   │   │   └── .gitkeep
+│   │   │   ├── __init__.py
+│   │   │   └── main.py
+│   │   ├── tests/
+│   │   │   ├── integration/
+│   │   │   │   └── .gitkeep
+│   │   │   └── unit/
+│   │   │       └── .gitkeep
+│   │   ├── pyproject.toml
+│   │   └── README.md
+│   └── azure-devops-mcp/
+│       ├── app/
+│       │   ├── auth/
+│       │   │   └── .gitkeep
+│       │   ├── azure_devops/
+│       │   │   └── .gitkeep
+│       │   ├── schemas/
+│       │   │   └── .gitkeep
+│       │   ├── tools/
+│       │   │   └── .gitkeep
+│       │   ├── __init__.py
+│       │   └── server.py
+│       ├── tests/
+│       │   ├── integration/
+│       │   │   └── .gitkeep
+│       │   └── unit/
+│       │       └── .gitkeep
+│       ├── pyproject.toml
+│       └── README.md
+├── tests/
+│   └── e2e/
+│       └── .gitkeep
+├── .editorconfig
+├── .env.example
+├── .gitignore
+├── .postcssrc.json
+├── angular.json
+├── nest-cli.json
+├── package.json
+├── README.md
+└── tsconfig.json

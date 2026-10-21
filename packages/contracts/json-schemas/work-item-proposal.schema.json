@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/work-item-proposal.schema.json",
+  "title": "Work Item Proposal",
+  "description": "Initial placeholder schema for an AI-generated Azure DevOps work-item proposal.",
+  "type": "object",
+  "required": ["title", "workItemType", "children"],
+  "properties": {
+    "title": { "type": "string", "minLength": 1 },
+    "workItemType": { "type": "string", "enum": ["Epic", "Feature", "User Story", "Product Backlog Item", "Task", "Bug"] },
+    "description": { "type": "string" },
+    "acceptanceCriteria": { "type": "string" },
+    "priority": { "type": ["integer", "null"], "minimum": 1, "maximum": 4 },
+    "estimate": { "type": ["number", "null"], "minimum": 0 },
+    "sourceReferences": { "type": "array", "items": { "type": "string" } },
+    "children": { "type": "array", "items": { "$ref": "#" } }
+  },
+  "additionalProperties": false
+}
