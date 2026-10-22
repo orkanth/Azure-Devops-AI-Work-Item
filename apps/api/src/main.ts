@@ -1,14 +1,30 @@
-import 'reflect-metadata';
-import { ValidationPipe } from '@nestjs/common';
-import { NestFactory } from '@nestjs/core';
-import { AppModule } from './app.module';
+/**
+ * This is not a production server yet!
+ * This is only a minimal backend to get started.
+ */
 
-async function bootstrap(): Promise<void> {
+import 'dotenv/config';
+
+import { Logger } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app/app.module';
+
+async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.setGlobalPrefix('api');
-  app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true, forbidNonWhitelisted: true }));
-  const port = Number(process.env['API_PORT'] ?? 3000);
+
+  Logger.log(`Working directory: ${process.cwd()}`);
+  Logger.log(`PORT loaded: ${JSON.stringify(process.env.PORT)}`);
+
+  const globalPrefix = 'api';
+  app.setGlobalPrefix(globalPrefix);
+
+  const port = Number(process.env.PORT) || 3000;
+
   await app.listen(port);
+
+  Logger.log(
+    `Application is running on: http://localhost:${port}/${globalPrefix}`,
+  );
 }
 
-void bootstrap();
+bootstrap();
