@@ -8,12 +8,12 @@ describe('InMemoryWorkItemStore', () => {
   });
 
   it('restores an independent copy of the seed work items', async () => {
-    expect(store.items().length).toBe(9);
+    expect(store.items().length).toBe(10);
 
     await store.delete(101);
     store.resetDemoData();
 
-    expect(store.items().length).toBe(9);
+    expect(store.items().length).toBe(10);
     expect(store.findById(101)?.title).toBe('User Management Platform');
   });
 

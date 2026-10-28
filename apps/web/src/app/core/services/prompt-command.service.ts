@@ -26,7 +26,7 @@ export class PromptCommandService {
     const type = this.inferType(text);
     const title = this.inferCreateTitle(text, type);
     if (!type) {
-      return this.unknown('Please specify the work-item type: Epic, Feature, User Story, or Task.');
+      return this.unknown('Please specify the work-item type: Epic, Feature, User Story, Task, or Bug.');
     }
     if (!title) {
       return this.unknown(`I know you want to create a ${type}, but I need a title. For example: "Create a ${type.toLowerCase()} for password reset."`);
@@ -151,6 +151,7 @@ export class PromptCommandService {
     if (/\bepics?\b/i.test(text)) return 'Epic';
     if (/\bfeatures?\b/i.test(text)) return 'Feature';
     if (/\btasks?\b/i.test(text)) return 'Task';
+    if (/\bbugs?\b/i.test(text)) return 'Bug';
     return undefined;
   }
 

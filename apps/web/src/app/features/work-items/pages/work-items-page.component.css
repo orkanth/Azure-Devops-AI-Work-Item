@@ -1,17 +1,26 @@
 :host {
   display: block;
+  min-width: 0;
 }
 
+/* The old table component owned these styles. The TreeTable now lives on this page,
+   so its card and row content must be styled by the page that renders them. */
 .work-items-page-card {
   margin-top: 0;
+  border: 1px solid #e7ebf2;
+  border-radius: 11px;
+  overflow: hidden;
+  background: #fff;
+  box-shadow: 0 2px 8px rgb(37 59 90 / 3%);
 }
 
 .filters-row {
   display: flex;
-  gap: 9px;
   align-items: center;
+  gap: 9px;
   padding: 14px;
   border-bottom: 1px solid #edf0f5;
+  background: #fff;
 }
 
 .search-field {
@@ -19,48 +28,308 @@
   align-items: center;
   gap: 8px;
   flex: 1;
-  min-width: 160px;
-  max-width: 390px;
-  border: 1px solid #e2e7ef;
+  min-width: 190px;
+  max-width: 430px;
+  height: 36px;
+  padding: 0 11px;
+  border: 1px solid #dfe5ef;
   border-radius: 7px;
-  padding: 0 10px;
-  height: 34px;
-  color: #9ca7b6;
+  background: #fff;
+  color: #8f9bb0;
 }
 
 .search-field > i {
-  font-size: 11px;
+  flex-shrink: 0;
+  font-size: 12px;
 }
 
 .search-field input {
   flex: 1;
   min-width: 0;
+  height: 100%;
   border: 0;
   outline: 0;
   background: transparent;
-  font-family: inherit;
-  color: #3b475b;
-  font-size: 10px;
+  color: #35445b;
+  font: inherit;
+  font-size: 11px;
 }
 
 .search-field input::placeholder {
-  color: #a8b0bd;
+  color: #9ca8ba;
 }
 
 .filters-row select {
-  height: 34px;
-  border: 1px solid #e2e7ef;
-  background: #fff;
+  min-width: 115px;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #dfe5ef;
   border-radius: 7px;
-  color: #647188;
-  font-family: inherit;
-  font-size: 10px;
-  padding: 0 9px;
-  outline: 0;
+  background: #fff;
+  color: #5d6b81;
+  font: inherit;
+  font-size: 11px;
 }
 
 .filter-reset {
-  padding: 9px 10px;
+  min-height: 36px;
+  padding: 8px 11px;
+}
+
+.tree-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  background: #fff;
+}
+
+.work-items-tree {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
+/* PrimeNG's internal table needs a fixed layout so long names cannot push
+   neighbouring columns over one another. The percentages add up to 100%. */
+:host ::ng-deep .work-items-tree .p-treetable-table {
+  width: 100%;
+  min-width: 72rem;
+  table-layout: fixed;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+:host ::ng-deep .work-items-tree .p-treetable-thead > tr > th {
+  padding: 12px 14px;
+  background: #f8fafd;
+  border-bottom: 1px solid #e7edf5;
+  color: #8591a5;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.35;
+  text-align: left;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+:host ::ng-deep .work-items-tree .p-treetable-tbody > tr > td {
+  padding: 12px 14px;
+  background: #fff;
+  border-bottom: 1px solid #edf0f5;
+  color: #637187;
+  font-size: 10px;
+  line-height: 1.4;
+  vertical-align: middle;
+}
+
+:host ::ng-deep .work-items-tree .p-treetable-tbody > tr:last-child > td {
+  border-bottom: 0;
+}
+
+.tree-id-column {
+  width: 5%;
+}
+
+.tree-work-item-column {
+  width: 30%;
+}
+
+.tree-parent-column {
+  width: 19%;
+}
+
+.tree-state-column {
+  width: 10%;
+}
+
+.tree-assigned-column {
+  width: 16%;
+}
+
+.tree-priority-column {
+  width: 10%;
+}
+
+.tree-actions-column {
+  width: 10%;
+}
+
+.tree-work-item-cell {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tree-work-item-cell .work-item-title {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.tree-work-item-cell .work-item-title > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.tree-work-item-cell .work-item-title strong {
+  color: #364257;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.tree-work-item-cell .work-item-title small {
+  color: #929daf;
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.avatar-blue {
+  width: 30px;
+  height: 30px;
+  background: #d8e9ff;
+  color: #315f9e;
+}
+
+.avatar-xs {
+  width: 23px;
+  height: 23px;
+  font-size: 8px;
+}
+
+.avatar-unassigned {
+  background: #eef0f4;
+  color: #8c96a7;
+}
+
+.assignee {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #667388;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.parent-cell {
+  overflow: hidden;
+  color: #8590a1;
+  font-size: 10px;
+}
+
+.parent-cell-text {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.id-cell {
+  color: #9ba5b4;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.priority-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #7b8799;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.priority-text i {
+  font-size: 9px;
+}
+
+.priority-high i {
+  color: #d65f68;
+}
+
+.priority-medium i {
+  color: #dfa747;
+}
+
+.priority-low i {
+  color: #8e9cae;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.row-action {
+  width: 28px;
+  height: 28px;
+  color: #8794a8;
+  font-size: 11px;
+}
+
+.row-action:hover {
+  background: #efedff;
+  color: #7363d6;
+}
+
+.danger-action:hover {
+  background: #fff0f0;
+  color: #cc4f5a;
+}
+
+.table-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  border-top: 1px solid #edf0f5;
+  background: #fff;
+  padding: 11px 14px;
+  color: #8e9aad;
+  font-size: 10px;
+}
+
+.table-footer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: #7665df;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.empty-cell {
+  padding: 38px 16px !important;
+  text-align: center;
+  color: #8c97a9;
+}
+
+.empty-cell > i,
+.empty-cell > strong,
+.empty-cell > span {
+  display: block;
+  margin: 6px auto;
+}
+
+.empty-cell > strong {
+  color: #627087;
+  font-size: 12px;
 }
 
 .command-tip {
@@ -68,17 +337,18 @@
   align-items: center;
   gap: 12px;
   margin-top: 16px;
-  background: #f1efff;
+  padding: 13px;
   border: 1px solid #e4dfff;
   border-radius: 9px;
-  padding: 13px;
+  background: #f1efff;
 }
 
 .tip-icon {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
   border-radius: 9px;
   background: #fff;
   color: #7a6be1;
@@ -86,28 +356,35 @@
 
 .command-tip > div:nth-child(2) {
   flex: 1;
+  min-width: 0;
 }
 
 .command-tip strong {
-  font-size: 11px;
   color: #4c458b;
+  font-size: 12px;
 }
 
 .command-tip p {
   margin: 4px 0 0;
   color: #8580b7;
-  font-size: 9px;
+  font-size: 10px;
   line-height: 1.5;
+}
+
+.work-items-delete-preview {
+  margin-bottom: 15px;
 }
 
 @media (max-width: 900px) {
   .filters-row {
     flex-wrap: wrap;
   }
+
   .search-field {
     max-width: none;
     flex-basis: 100%;
   }
+
   .filters-row select {
     flex: 1;
   }
@@ -117,20 +394,47 @@
   .command-tip {
     flex-wrap: wrap;
   }
+
   .command-tip .button {
-    margin-left: 44px;
+    margin-left: 48px;
   }
+
   .filters-row {
     padding: 10px;
   }
+
   .filters-row select {
     min-width: 100px;
   }
+
   .filter-reset {
     padding: 8px;
   }
+
+  .table-footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
-.work-items-delete-preview {
-  margin-bottom: 15px;
+/* Keep tree controls compact and prevent flex children from forcing cell overflow. */
+:host ::ng-deep .work-items-tree .p-treetable-toggler {
+  flex: 0 0 1.35rem;
+  width: 1.35rem;
+  height: 1.35rem;
+  margin-right: 2px;
+}
+
+:host ::ng-deep .work-items-tree .p-treetable-tbody > tr > td.tree-actions-column {
+  white-space: nowrap;
+}
+
+.tree-work-item-cell .type-icon {
+  flex: 0 0 30px;
+}
+
+@media (max-width: 900px) {
+  :host ::ng-deep .work-items-tree .p-treetable-table {
+    min-width: 72rem;
+  }
 }

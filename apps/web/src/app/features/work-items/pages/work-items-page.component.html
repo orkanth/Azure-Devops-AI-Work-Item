@@ -6,7 +6,7 @@
     </div>
     <h1>Work items</h1>
     <p class="welcome-subtitle">
-      Browse, edit, assign or remove the items generated for your project.
+      Browse work items as a hierarchy, and edit, assign or remove items from your project.
     </p>
   </div>
   <button type="button" class="button button-primary" (click)="startCreatePrompt()">
@@ -65,46 +65,152 @@
   </div>
 </section>
 
-<app-work-item-table
-  [items]="filteredItems"
-  [allItems]="items()"
-  [totalCount]="items().length"
-  mode="full"
-  [showReset]="supportsDemoReset"
-  (editRequested)="startEdit($event)"
-  (deleteRequested)="prepareDelete($event)"
-  (resetRequested)="resetDemo()"
->
-  <div work-item-filters class="filters-row">
+<section class="table-card work-items-page-card">
+  <div class="filters-row">
     <label class="search-field">
       <i class="pi pi-search" aria-hidden="true"></i>
       <input
         type="search"
-        [(ngModel)]="searchTerm"
+        [ngModel]="searchTerm()"
+        (ngModelChange)="searchTerm.set($event)"
         aria-label="Search work items"
-        placeholder="Search by title, ID or assignee"
+        placeholder="Search by title, ID, assignee or state"
       />
     </label>
 
-    <select [(ngModel)]="typeFilter" aria-label="Filter by work item type">
+    <select
+      [ngModel]="typeFilter()"
+      (ngModelChange)="typeFilter.set($event)"
+      aria-label="Filter by work item type"
+    >
       <option>All types</option>
       <option *ngFor="let type of workItemTypes">{{ type }}</option>
     </select>
 
-    <select [(ngModel)]="stateFilter" aria-label="Filter by state">
+    <select
+      [ngModel]="stateFilter()"
+      (ngModelChange)="stateFilter.set($event)"
+      aria-label="Filter by state"
+    >
       <option>All states</option>
       <option *ngFor="let state of workItemStates">{{ state }}</option>
     </select>
 
-    <button
-      type="button"
-      class="button button-secondary filter-reset"
-      (click)="searchTerm = ''; typeFilter = 'All types'; stateFilter = 'All states'"
-    >
-      <i class="pi pi-filter-slash" aria-hidden="true"></i> Reset
+    <button type="button" class="button button-secondary filter-reset" (click)="resetFilters()">
+      <i class="pi pi-filter-slash" aria-hidden="true"></i> Reset filters
     </button>
   </div>
-</app-work-item-table>
+
+  <div class="table-scroll tree-table-scroll">
+    <p-treetable
+      *ngIf="treeNodes().length > 0; else noWorkItems"
+      class="work-items-tree"
+      [value]="treeNodes()"
+      [scrollable]="true"
+      [tableStyle]="{ 'min-width': '72rem', width: '100%', 'table-layout': 'fixed' }"
+    >
+      <ng-template #header>
+        <tr>
+          <th class="tree-id-column">ID</th>
+          <th class="tree-work-item-column">WORK ITEM</th>
+          <th class="tree-parent-column">PARENT</th>
+          <th class="tree-state-column">STATE</th>
+          <th class="tree-assigned-column">ASSIGNED TO</th>
+          <th class="tree-priority-column">PRIORITY</th>
+          <th class="tree-actions-column">ACTIONS</th>
+        </tr>
+      </ng-template>
+
+      <ng-template #body let-rowNode let-rowData="rowData">
+        <tr [ttRow]="rowNode">
+          <td class="id-cell tree-id-column">#{{ rowData.id }}</td>
+          <td class="tree-work-item-column">
+            <div class="tree-work-item-cell">
+              <p-treetable-toggler [rowNode]="rowNode"></p-treetable-toggler>
+              <div class="work-item-title">
+                <span class="type-icon" [ngClass]="typeClass(rowData.type)">
+                  {{ typeLetter(rowData.type) }}
+                </span>
+                <div>
+                  <strong>{{ rowData.title }}</strong>
+                  <small>
+                    {{ rowData.type }} · Updated {{ rowData.updatedAt }}
+                  </small>
+                </div>
+              </div>
+            </div>
+          </td>
+          <td class="parent-cell tree-parent-column">
+            <span class="parent-cell-text" [attr.title]="parentTitle(rowData.parentId)">
+              {{ parentTitle(rowData.parentId) }}
+            </span>
+          </td>
+          <td class="tree-state-column">
+            <span class="state-pill" [ngClass]="stateClass(rowData.state)">
+              <span></span>{{ rowData.state }}
+            </span>
+          </td>
+          <td class="tree-assigned-column">
+            <div class="assignee">
+              <span
+                class="avatar avatar-xs"
+                [ngClass]="rowData.assignedTo === 'Unassigned' ? 'avatar-unassigned' : 'avatar-blue'"
+              >
+                {{ initials(rowData.assignedTo) }}
+              </span>
+              {{ rowData.assignedTo }}
+            </div>
+          </td>
+          <td class="tree-priority-column">
+            <span class="priority-text" [ngClass]="'priority-' + rowData.priority.toLowerCase()">
+              <i class="pi pi-flag-fill" aria-hidden="true"></i>{{ rowData.priority }}
+            </span>
+          </td>
+          <td class="tree-actions-column">
+            <div class="row-actions">
+              <button
+                type="button"
+                class="icon-button row-action"
+                title="Edit work item"
+                [attr.aria-label]="'Edit work item #' + rowData.id"
+                (click)="startEdit(rowData)"
+              >
+                <i class="pi pi-pencil" aria-hidden="true"></i>
+              </button>
+              <button
+                type="button"
+                class="icon-button row-action danger-action"
+                title="Prepare delete"
+                [attr.aria-label]="'Prepare delete for work item #' + rowData.id"
+                (click)="prepareDelete(rowData)"
+              >
+                <i class="pi pi-trash" aria-hidden="true"></i>
+              </button>
+            </div>
+          </td>
+        </tr>
+      </ng-template>
+    </p-treetable>
+
+    <ng-template #noWorkItems>
+      <div class="empty-cell tree-empty-state">
+        <i class="pi pi-search" aria-hidden="true"></i>
+        <strong>No work items match your filters</strong>
+        <span>Try a different search or reset the filters.</span>
+      </div>
+    </ng-template>
+  </div>
+
+  <div class="table-footer">
+    <span>
+      Showing {{ visibleTreeNodeCount() }} items in the hierarchy
+      ({{ matchingItems().length }} matched · {{ items().length }} total)
+    </span>
+    <button *ngIf="supportsDemoReset" type="button" (click)="resetDemo()">
+      <i class="pi pi-refresh" aria-hidden="true"></i> Reset demo data
+    </button>
+  </div>
+</section>
 
 <div class="command-tip">
   <div class="tip-icon"><i class="pi pi-sparkles" aria-hidden="true"></i></div>

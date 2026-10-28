@@ -1,4 +1,4 @@
-export type WorkItemType = 'Epic' | 'Feature' | 'User Story' | 'Task';
+export type WorkItemType = 'Epic' | 'Feature' | 'User Story' | 'Task' | 'Bug';
 export type WorkItemState = 'New' | 'Active' | 'Resolved' | 'Closed';
 export type WorkItemPriority = 'Low' | 'Medium' | 'High';
 

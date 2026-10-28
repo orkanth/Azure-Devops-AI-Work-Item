@@ -92,13 +92,23 @@ const INITIAL_WORK_ITEMS: WorkItem[] = [
     parentId: 108,
     updatedAt: 'Oct 16',
   },
+  {
+    id: 110,
+    type: 'Bug',
+    title: 'Password reset link validation fails',
+    state: 'New',
+    assignedTo: 'Unassigned',
+    priority: 'High',
+    parentId: 107,
+    updatedAt: 'Today',
+  },
 ];
 
 /** In-memory adapter used only while the Azure DevOps API is not connected. */
 @Injectable()
 export class InMemoryWorkItemStore implements WorkItemStore {
   readonly items = signal<WorkItem[]>(this.cloneInitialItems());
-  private nextId = 110;
+  private nextId = 111;
 
   /** Seed data is already available locally, so refreshing the demo store is a no-op. */
   refresh(): Promise<void> {
@@ -147,7 +157,7 @@ export class InMemoryWorkItemStore implements WorkItemStore {
 
   resetDemoData(): void {
     this.items.set(this.cloneInitialItems());
-    this.nextId = 110;
+    this.nextId = 111;
   }
 
   getCounts(): WorkItemCounts {
