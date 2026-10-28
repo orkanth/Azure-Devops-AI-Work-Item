@@ -69,3 +69,9 @@ Then open `http://localhost:4200`.
 - `Delete task #106` — displays a separate confirmation checkbox before changing the local demo data.
 
 Updates and deletes resolve the target by ID when an ID is supplied. If a title matches multiple items, the UI asks you to select the exact item. For the live implementation, the backend must revalidate target IDs and user identity, and execute writes only after the appropriate approval.
+
+
+######Create Nestjs Service, Contoller, Modules#########
+npx nx g @nx/nest:service apps/api/src/app/modules/health/health.service.ts
+npx nx g @nx/nest:module apps/api/src/app/modules/health/health.module.
+npx nx g @nx/nest:controller apps/api/src/app/modules/health/health.controller.ts --module=apps/api/src/app/modules/health/health.module.ts

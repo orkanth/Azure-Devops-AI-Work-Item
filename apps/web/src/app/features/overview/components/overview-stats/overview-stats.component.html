@@ -1,0 +1,37 @@
+<section class="stats-grid" aria-label="Work item summary">
+  <article class="stat-card">
+    <div class="stat-top">
+      <span class="stat-label">Total work items</span>
+      <span class="stat-icon icon-blue"><i class="pi pi-objects-column" aria-hidden="true"></i></span>
+    </div>
+    <div class="stat-value">{{ stats.total }}<span class="stat-note">sample items</span></div>
+    <div class="stat-foot"><span class="mini-dot blue-dot"></span> Across all work item types</div>
+  </article>
+
+  <article class="stat-card">
+    <div class="stat-top">
+      <span class="stat-label">In progress</span>
+      <span class="stat-icon icon-violet"><i class="pi pi-spinner" aria-hidden="true"></i></span>
+    </div>
+    <div class="stat-value">{{ formatCount(stats.active) }}<span class="stat-note">items</span></div>
+    <div class="stat-foot"><span class="mini-dot violet-dot"></span> Currently being worked on</div>
+  </article>
+
+  <article class="stat-card">
+    <div class="stat-top">
+      <span class="stat-label">Ready to start</span>
+      <span class="stat-icon icon-amber"><i class="pi pi-clock" aria-hidden="true"></i></span>
+    </div>
+    <div class="stat-value">{{ formatCount(stats.newItems) }}<span class="stat-note">items</span></div>
+    <div class="stat-foot"><span class="mini-dot amber-dot"></span> Waiting to be picked up</div>
+  </article>
+
+  <article class="stat-card">
+    <div class="stat-top">
+      <span class="stat-label">Resolved</span>
+      <span class="stat-icon icon-green"><i class="pi pi-check-circle" aria-hidden="true"></i></span>
+    </div>
+    <div class="stat-value">{{ formatCount(stats.completed) }}<span class="stat-note">items</span></div>
+    <div class="stat-foot"><span class="mini-dot green-dot"></span> Resolved or closed</div>
+  </article>
+</section>

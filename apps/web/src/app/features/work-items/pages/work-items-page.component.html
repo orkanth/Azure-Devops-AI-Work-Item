@@ -1,0 +1,127 @@
+<section class="page-heading-row">
+  <div>
+    <div class="eyebrow">
+      <span class="eyebrow-sparkle"><i class="pi pi-list-check" aria-hidden="true"></i></span>
+      DELIVERY TRACKING
+    </div>
+    <h1>Work items</h1>
+    <p class="welcome-subtitle">
+      Browse, edit, assign or remove the items generated for your project.
+    </p>
+  </div>
+  <button type="button" class="button button-primary" (click)="startCreatePrompt()">
+    <i class="pi pi-plus" aria-hidden="true"></i> Create with AI
+  </button>
+</section>
+
+<section
+  class="proposal-card work-items-delete-preview"
+  *ngIf="deleteTarget"
+  aria-live="polite"
+  aria-labelledby="delete-preview-title"
+>
+  <div class="proposal-heading">
+    <div class="proposal-symbol proposal-delete">
+      <i class="pi pi-trash" aria-hidden="true"></i>
+    </div>
+    <div class="proposal-title">
+      <div class="section-kicker">DELETE PREVIEW</div>
+      <h3 id="delete-preview-title">
+        Delete {{ deleteTarget.type }} #{{ deleteTarget.id }}: “{{ deleteTarget.title }}”?
+      </h3>
+      <p>Review the exact item before confirming. This only changes the local demo data.</p>
+    </div>
+    <button
+      type="button"
+      class="icon-button"
+      (click)="cancelDelete()"
+      aria-label="Dismiss delete preview"
+    >
+      <i class="pi pi-times" aria-hidden="true"></i>
+    </button>
+  </div>
+
+  <div class="delete-ack">
+    <label>
+      <input type="checkbox" [(ngModel)]="deleteAcknowledged" />
+      I confirm I want to delete work item #{{ deleteTarget.id }} from the current demo data.
+    </label>
+    <p>
+      Child items will be kept and detached from this parent. The live Azure DevOps integration
+      will require explicit confirmation before a delete request.
+    </p>
+  </div>
+
+  <div class="proposal-actions">
+    <button type="button" class="button button-quiet" (click)="cancelDelete()">Cancel</button>
+    <button
+      type="button"
+      class="button button-danger"
+      [disabled]="!deleteAcknowledged"
+      (click)="confirmDelete()"
+    >
+      <i class="pi pi-trash" aria-hidden="true"></i> Confirm delete
+    </button>
+  </div>
+</section>
+
+<app-work-item-table
+  [items]="filteredItems"
+  [allItems]="items()"
+  [totalCount]="items().length"
+  mode="full"
+  [showReset]="supportsDemoReset"
+  (editRequested)="startEdit($event)"
+  (deleteRequested)="prepareDelete($event)"
+  (resetRequested)="resetDemo()"
+>
+  <div work-item-filters class="filters-row">
+    <label class="search-field">
+      <i class="pi pi-search" aria-hidden="true"></i>
+      <input
+        type="search"
+        [(ngModel)]="searchTerm"
+        aria-label="Search work items"
+        placeholder="Search by title, ID or assignee"
+      />
+    </label>
+
+    <select [(ngModel)]="typeFilter" aria-label="Filter by work item type">
+      <option>All types</option>
+      <option *ngFor="let type of workItemTypes">{{ type }}</option>
+    </select>
+
+    <select [(ngModel)]="stateFilter" aria-label="Filter by state">
+      <option>All states</option>
+      <option *ngFor="let state of workItemStates">{{ state }}</option>
+    </select>
+
+    <button
+      type="button"
+      class="button button-secondary filter-reset"
+      (click)="searchTerm = ''; typeFilter = 'All types'; stateFilter = 'All states'"
+    >
+      <i class="pi pi-filter-slash" aria-hidden="true"></i> Reset
+    </button>
+  </div>
+</app-work-item-table>
+
+<div class="command-tip">
+  <div class="tip-icon"><i class="pi pi-sparkles" aria-hidden="true"></i></div>
+  <div>
+    <strong>Want to make a change by prompt?</strong>
+    <p>Try “Assign task #104 to Alex Morgan” or “Move #105 to Done” in the AI command center.</p>
+  </div>
+  <button type="button" class="button button-secondary" (click)="navigateToCommands()">
+    Open AI commands <i class="pi pi-arrow-right" aria-hidden="true"></i>
+  </button>
+</div>
+
+<app-work-item-edit-dialog
+  [item]="editingItem"
+  [workItemTypes]="workItemTypes"
+  [workItemStates]="workItemStates"
+  [priorities]="priorities"
+  (closed)="closeEdit()"
+  (saved)="saveEdit($event)"
+></app-work-item-edit-dialog>

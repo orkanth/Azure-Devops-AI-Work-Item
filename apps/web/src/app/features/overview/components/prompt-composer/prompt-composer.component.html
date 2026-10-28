@@ -1,0 +1,50 @@
+<section class="command-card" aria-labelledby="command-title">
+  <div class="command-header">
+    <div class="command-heading">
+      <div class="command-icon"><i class="pi pi-sparkles" aria-hidden="true"></i></div>
+      <div>
+        <h2 id="command-title">What would you like to do?</h2>
+        <p>Describe the change in plain English. We'll prepare it for your review.</p>
+      </div>
+    </div>
+    <span class="beta-pill">AI COMMANDS <span>PREVIEW</span></span>
+  </div>
+
+  <div class="command-input-wrap">
+    <textarea
+      [ngModel]="promptText"
+      (ngModelChange)="promptTextChange.emit($event)"
+      (keydown.control.enter)="submit()"
+      (keydown.meta.enter)="submit()"
+      rows="3"
+      aria-label="Describe a work item action"
+      placeholder="e.g. Create a user story for password reset, assign task #104 to Alex, or move API validation to Done..."
+    ></textarea>
+    <div class="command-input-footer">
+      <span>
+        <i class="pi pi-info-circle" aria-hidden="true"></i>
+        Use an ID like <code>#104</code> to identify the exact work item
+      </span>
+      <button
+        type="button"
+        class="button button-primary"
+        [disabled]="!promptText.trim()"
+        (click)="submit()"
+      >
+        <i class="pi pi-sparkles" aria-hidden="true"></i> Review command
+        <i class="pi pi-arrow-right" aria-hidden="true"></i>
+      </button>
+    </div>
+  </div>
+
+  <div class="prompt-examples">
+    <span class="examples-label">TRY A PROMPT</span>
+    <button
+      type="button"
+      *ngFor="let prompt of samplePrompts"
+      (click)="promptTextChange.emit(prompt)"
+    >
+      <i class="pi pi-arrow-up-left" aria-hidden="true"></i>{{ prompt }}
+    </button>
+  </div>
+</section>

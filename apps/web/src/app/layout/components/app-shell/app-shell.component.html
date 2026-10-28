@@ -1,0 +1,56 @@
+<div class="app-shell">
+  <app-nav
+    [workItemCount]="items().length"
+    (promptSelected)="fillPrompt($event)"
+  ></app-nav>
+
+  <main class="main-area">
+    <app-header [title]="visibleTitle()"></app-header>
+
+    <div class="content-area">
+      <!-- <div class="demo-banner" role="note">
+        <i class="pi pi-info-circle" aria-hidden="true"></i>
+        <span>
+          <strong>Prototype mode:</strong>
+          actions change sample data in this browser only. Azure DevOps, the LLM,
+          RAG and MCP services are not connected yet.
+        </span>
+        <button type="button" (click)="openView('integrations')">
+          View setup <i class="pi pi-arrow-right" aria-hidden="true"></i>
+        </button>
+      </div> -->
+
+      <div
+        *ngIf="feedback.message()"
+        class="notice"
+        [ngClass]="'notice-' + feedback.kind()"
+        role="status"
+        aria-live="polite"
+      >
+        <i
+          class="pi"
+          aria-hidden="true"
+          [ngClass]="
+            feedback.kind() === 'success'
+              ? 'pi-check-circle'
+              : feedback.kind() === 'error'
+                ? 'pi-exclamation-circle'
+                : 'pi-info-circle'
+          "
+        ></i>
+        <span>{{ feedback.message() }}</span>
+        <button
+          type="button"
+          class="notice-close"
+          (click)="feedback.clear()"
+          aria-label="Dismiss notification"
+        >
+          <i class="pi pi-times" aria-hidden="true"></i>
+        </button>
+      </div>
+
+      <router-outlet></router-outlet>
+      <app-footer [year]="currentYear"></app-footer>
+    </div>
+  </main>
+</div>

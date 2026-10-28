@@ -1,0 +1,168 @@
+<section
+  *ngIf="proposal as current"
+  class="proposal-card"
+  aria-live="polite"
+  aria-labelledby="proposal-title"
+>
+  <div class="proposal-heading">
+    <div class="proposal-symbol" [ngClass]="'proposal-' + current.kind">
+      <i
+        class="pi"
+        aria-hidden="true"
+        [ngClass]="
+          current.kind === 'delete'
+            ? 'pi-trash'
+            : current.kind === 'assign'
+              ? 'pi-user-edit'
+              : current.kind === 'create'
+                ? 'pi-plus-circle'
+                : current.kind === 'update'
+                  ? 'pi-pencil'
+                  : 'pi-sparkles'
+        "
+      ></i>
+    </div>
+    <div class="proposal-title">
+      <div class="section-kicker">COMMAND PREVIEW</div>
+      <h3 id="proposal-title">{{ current.description }}</h3>
+      <p *ngIf="current.kind !== 'unknown' && current.kind !== 'ambiguous'">
+        Nothing changes until you confirm this action.
+      </p>
+      <p *ngIf="current.kind === 'unknown'">No action has been applied.</p>
+    </div>
+    <button
+      type="button"
+      class="icon-button"
+      (click)="dismissed.emit()"
+      aria-label="Dismiss preview"
+    >
+      <i class="pi pi-times" aria-hidden="true"></i>
+    </button>
+  </div>
+
+  <div
+    *ngIf="current.error"
+    class="proposal-message"
+    [class.proposal-error]="current.kind === 'unknown'"
+  >
+    <i
+      class="pi"
+      aria-hidden="true"
+      [ngClass]="current.kind === 'unknown' ? 'pi-info-circle' : 'pi-exclamation-triangle'"
+    ></i>
+    {{ current.error }}
+  </div>
+
+  <div
+    *ngIf="current.kind === 'ambiguous' && current.candidates?.length"
+    class="candidate-list"
+  >
+    <p>Select the exact work item to continue:</p>
+    <button
+      type="button"
+      *ngFor="let candidate of current.candidates"
+      class="candidate-row"
+      (click)="candidateSelected.emit(candidate)"
+    >
+      <span class="type-icon" [ngClass]="typeClass(candidate.type)">
+        {{ typeLetter(candidate.type) }}
+      </span>
+      <span class="candidate-copy">
+        <strong>#{{ candidate.id }} · {{ candidate.title }}</strong>
+        <small>{{ candidate.type }} · {{ candidate.state }} · {{ candidate.assignedTo }}</small>
+      </span>
+      <i class="pi pi-chevron-right" aria-hidden="true"></i>
+    </button>
+  </div>
+
+  <div class="proposal-details" *ngIf="current.target">
+    <div class="detail-item">
+      <span class="detail-label">Selected work item</span>
+      <strong>#{{ current.target.id }} · {{ current.target.title }}</strong>
+      <small>{{ current.target.type }}</small>
+    </div>
+    <div class="detail-item" *ngIf="current.kind === 'assign'">
+      <span class="detail-label">New assignee</span>
+      <strong><i class="pi pi-user" aria-hidden="true"></i>{{ current.assignee }}</strong>
+    </div>
+    <div
+      class="detail-item"
+      *ngIf="current.kind === 'update' && current.changes?.state"
+    >
+      <span class="detail-label">New state</span>
+      <strong>
+        <span class="state-pill" [ngClass]="stateClass(current.changes?.state ?? 'New')">
+          {{ current.changes?.state }}
+        </span>
+      </strong>
+    </div>
+    <div
+      class="detail-item"
+      *ngIf="current.kind === 'update' && current.changes?.title"
+    >
+      <span class="detail-label">New title</span>
+      <strong>{{ current.changes?.title }}</strong>
+    </div>
+  </div>
+
+  <div
+    class="proposal-details"
+    *ngIf="current.kind === 'create' && current.newItem"
+  >
+    <div class="detail-item">
+      <span class="detail-label">Work item type</span>
+      <strong>
+        <span class="type-pill" [ngClass]="typeClass(current.newItem.type ?? 'Task')">
+          {{ current.newItem.type }}
+        </span>
+      </strong>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Title</span>
+      <strong>{{ current.newItem.title }}</strong>
+    </div>
+    <div class="detail-item">
+      <span class="detail-label">Initial state</span>
+      <strong><span class="state-pill new">New</span></strong>
+    </div>
+  </div>
+
+  <div class="delete-ack" *ngIf="current.kind === 'delete'">
+    <label>
+      <input
+        type="checkbox"
+        [ngModel]="deleteAcknowledged"
+        (ngModelChange)="deleteAcknowledgedChange.emit($event)"
+      />
+      I confirm I want to delete work item #{{ current.target?.id }} from the current demo data.
+    </label>
+    <p>
+      In the live integration, we will require explicit confirmation and verify the item ID before
+      sending a delete request.
+    </p>
+  </div>
+
+  <div
+    class="proposal-actions"
+    *ngIf="current.kind !== 'unknown' && current.kind !== 'ambiguous'"
+  >
+    <button type="button" class="button button-quiet" (click)="dismissed.emit()">
+      Cancel
+    </button>
+    <button
+      type="button"
+      class="button"
+      [class.button-danger]="current.kind === 'delete'"
+      [class.button-primary]="current.kind !== 'delete'"
+      [disabled]="current.kind === 'delete' && !deleteAcknowledged"
+      (click)="confirmed.emit()"
+    >
+      <i
+        class="pi"
+        aria-hidden="true"
+        [ngClass]="current.kind === 'delete' ? 'pi-trash' : 'pi-check'"
+      ></i>
+      {{ current.kind === 'delete' ? 'Confirm delete' : 'Apply to demo data' }}
+    </button>
+  </div>
+</section>

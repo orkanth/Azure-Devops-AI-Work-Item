@@ -1,0 +1,55 @@
+<section class="welcome-row">
+  <div>
+    <div class="eyebrow">
+      <span class="eyebrow-sparkle"><i class="pi pi-sparkles" aria-hidden="true"></i></span>
+      YOUR AI WORKSPACE
+    </div>
+    <h1>Make work happen <span>with AI.</span></h1>
+    <p class="welcome-subtitle">
+      Create, update, assign and manage Azure DevOps work items using natural language.
+    </p>
+  </div>
+  <button type="button" class="button button-secondary" (click)="navigateToWorkItems()">
+    <i class="pi pi-list" aria-hidden="true"></i> Browse work items
+  </button>
+</section>
+
+<app-overview-stats [stats]="stats()"></app-overview-stats>
+
+<app-prompt-composer
+  [promptText]="promptText"
+  [samplePrompts]="samplePrompts"
+  (promptTextChange)="promptText = $event"
+  (commandSubmitted)="submitPrompt()"
+></app-prompt-composer>
+
+<app-command-proposal
+  [proposal]="pendingProposal"
+  [deleteAcknowledged]="deleteAcknowledged"
+  (deleteAcknowledgedChange)="deleteAcknowledged = $event"
+  (candidateSelected)="selectCandidate($event)"
+  (dismissed)="dismissProposal()"
+  (confirmed)="applyProposal()"
+></app-command-proposal>
+
+<section class="recent-section">
+  <div class="section-heading">
+    <div>
+      <div class="section-kicker">PROJECT ACTIVITY</div>
+      <h2>Recent work items</h2>
+      <p>A quick view of the work your team is tracking.</p>
+    </div>
+    <button type="button" class="text-button" (click)="navigateToWorkItems()">
+      View all work items <i class="pi pi-arrow-right" aria-hidden="true"></i>
+    </button>
+  </div>
+
+  <app-work-item-table
+    [items]="items().slice(0, 5)"
+    [allItems]="items()"
+    [totalCount]="items().length"
+    mode="recent"
+    (editRequested)="startEdit($event)"
+    (openAllRequested)="navigateToWorkItems()"
+  ></app-work-item-table>
+</section>

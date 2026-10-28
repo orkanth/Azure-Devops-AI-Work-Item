@@ -1,0 +1,88 @@
+<section class="page-heading-row">
+  <div>
+    <div class="eyebrow">
+      <span class="eyebrow-sparkle"><i class="pi pi-plug" aria-hidden="true"></i></span>
+      CONNECTIONS
+    </div>
+    <h1>Integrations</h1>
+    <p class="welcome-subtitle">
+      Connect the services that let the assistant understand requests and safely update work items.
+    </p>
+  </div>
+</section>
+
+<section class="integration-grid" aria-label="Integration status">
+  <article class="integration-card">
+    <div class="integration-top">
+      <div class="integration-brand azure-brand"><i class="pi pi-cloud" aria-hidden="true"></i></div>
+      <span class="status-tag status-disconnected"><span></span> Not connected</span>
+    </div>
+    <h3>Azure DevOps</h3>
+    <p>
+      Read projects and work items, then create, update, assign and delete items through the Azure
+      DevOps REST API.
+    </p>
+    <div class="integration-footer">
+      <span><i class="pi pi-shield" aria-hidden="true"></i> Backend credentials only</span>
+      <button type="button" class="button button-secondary" disabled>Configure later</button>
+    </div>
+  </article>
+
+  <article class="integration-card">
+    <div class="integration-top">
+      <div class="integration-brand mcp-brand"><i class="pi pi-share-alt" aria-hidden="true"></i></div>
+      <span class="status-tag status-planned">Planned</span>
+    </div>
+    <h3>FastMCP server</h3>
+    <p>
+      Expose narrow, validated tools for listing work items, resolving identities, updating states
+      and creating parent-child links.
+    </p>
+    <div class="integration-footer">
+      <span><i class="pi pi-lock" aria-hidden="true"></i> Approval-gated write tools</span>
+      <button type="button" class="button button-secondary" disabled>Configure later</button>
+    </div>
+  </article>
+
+  <article class="integration-card">
+    <div class="integration-top">
+      <div class="integration-brand llm-brand"><i class="pi pi-sparkles" aria-hidden="true"></i></div>
+      <span class="status-tag status-disconnected"><span></span> Not connected</span>
+    </div>
+    <h3>LLM provider</h3>
+    <p>
+      Interpret prompts and produce validated work-item proposals. Provider and model selection will
+      live in backend configuration.
+    </p>
+    <div class="integration-footer">
+      <span><i class="pi pi-key" aria-hidden="true"></i> API key stored server-side</span>
+      <button type="button" class="button button-secondary" disabled>Configure later</button>
+    </div>
+  </article>
+
+  <article class="integration-card">
+    <div class="integration-top">
+      <div class="integration-brand chroma-brand"><i class="pi pi-database" aria-hidden="true"></i></div>
+      <span class="status-tag status-planned">Planned</span>
+    </div>
+    <h3>ChromaDB</h3>
+    <p>Store document embeddings and retrieve relevant specification passages for RAG.</p>
+    <div class="integration-footer">
+      <span><i class="pi pi-server" aria-hidden="true"></i> Local development first</span>
+      <button type="button" class="button button-secondary" disabled>Configure later</button>
+    </div>
+  </article>
+</section>
+
+<section class="security-card">
+  <div class="security-icon"><i class="pi pi-shield" aria-hidden="true"></i></div>
+  <div>
+    <h3>Security and change safety</h3>
+    <p>
+      Credentials will stay on the backend. Update operations must resolve the exact work item before
+      writing. Delete operations will display the target ID and title and require explicit
+      confirmation. Assignment will resolve a real Azure DevOps identity rather than relying on a
+      display-name guess.
+    </p>
+  </div>
+</section>

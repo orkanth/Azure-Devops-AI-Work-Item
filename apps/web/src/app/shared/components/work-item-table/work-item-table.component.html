@@ -1,0 +1,126 @@
+<div class="table-card" [class.work-items-page-card]="mode === 'full'">
+  <ng-content select="[work-item-filters]"></ng-content>
+
+  <div class="table-scroll">
+    <table class="work-table" [class.full-table]="mode === 'full'">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>WORK ITEM</th>
+          <th *ngIf="mode === 'full'">PARENT</th>
+          <th>STATE</th>
+          <th>ASSIGNED TO</th>
+          <th>PRIORITY</th>
+          <th>{{ mode === 'full' ? 'ACTIONS' : '' }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let item of items">
+          <td class="id-cell">#{{ item.id }}</td>
+          <td>
+            <div class="work-item-title">
+              <span class="type-icon" [ngClass]="typeClass(item.type)">
+                {{ typeLetter(item.type) }}
+              </span>
+              <div>
+                <strong>{{ item.title }}</strong>
+                <small>
+                  {{ item.type }}
+                  <ng-container *ngIf="mode === 'full'">
+                    · Updated {{ item.updatedAt }}
+                  </ng-container>
+                  <ng-container *ngIf="mode === 'recent' && item.parentId">
+                    · Parent #{{ item.parentId }}
+                  </ng-container>
+                </small>
+              </div>
+            </div>
+          </td>
+          <td class="parent-cell" *ngIf="mode === 'full'">
+            {{ parentTitle(item.parentId) }}
+          </td>
+          <td>
+            <span class="state-pill" [ngClass]="stateClass(item.state)">
+              <span aria-hidden="true"></span>{{ item.state }}
+            </span>
+          </td>
+          <td>
+            <div class="assignee">
+              <span
+                class="avatar avatar-xs"
+                [ngClass]="item.assignedTo === 'Unassigned' ? 'avatar-unassigned' : 'avatar-blue'"
+              >
+                {{ item.assignedTo === 'Unassigned' ? '?' : initials(item.assignedTo) }}
+              </span>
+              {{ item.assignedTo }}
+            </div>
+          </td>
+          <td>
+            <span class="priority-text" [ngClass]="'priority-' + item.priority.toLowerCase()">
+              <i class="pi pi-flag-fill" aria-hidden="true"></i>{{ item.priority }}
+            </span>
+          </td>
+          <td>
+            <div class="row-actions" *ngIf="mode === 'full'; else recentAction">
+              <button
+                type="button"
+                class="icon-button row-action"
+                title="Edit work item"
+                aria-label="Edit work item {{ item.id }}"
+                (click)="editRequested.emit(item)"
+              >
+                <i class="pi pi-pencil" aria-hidden="true"></i>
+              </button>
+              <button
+                type="button"
+                class="icon-button row-action danger-action"
+                title="Prepare delete"
+                aria-label="Prepare delete for work item {{ item.id }}"
+                (click)="deleteRequested.emit(item)"
+              >
+                <i class="pi pi-trash" aria-hidden="true"></i>
+              </button>
+            </div>
+            <ng-template #recentAction>
+              <button
+                type="button"
+                class="icon-button row-action"
+                title="Edit work item"
+                aria-label="Edit work item {{ item.id }}"
+                (click)="editRequested.emit(item)"
+              >
+                <i class="pi pi-pencil" aria-hidden="true"></i>
+              </button>
+            </ng-template>
+          </td>
+        </tr>
+        <tr *ngIf="items.length === 0">
+          <td [attr.colspan]="mode === 'full' ? 7 : 6" class="empty-cell">
+            <i class="pi pi-search" aria-hidden="true"></i>
+            <strong>No work items match your filters</strong>
+            <span>Try a different search or reset the filters.</span>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="table-footer">
+    <span *ngIf="mode === 'recent'">
+      Showing {{ items.length }} of {{ totalCount }} sample work items
+    </span>
+    <span *ngIf="mode === 'full'">
+      Showing {{ items.length }} of {{ totalCount }} work items
+    </span>
+    <button
+      *ngIf="mode === 'recent'"
+      type="button"
+      (click)="openAllRequested.emit()"
+    >
+      Open work items <i class="pi pi-arrow-right" aria-hidden="true"></i>
+    </button>
+    <button *ngIf="mode === 'full' && showReset" type="button" (click)="resetRequested.emit()">
+      <i class="pi pi-refresh" aria-hidden="true"></i> Reset demo data
+    </button>
+  </div>
+</div>

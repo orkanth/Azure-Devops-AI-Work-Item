@@ -1,0 +1,27 @@
+:host {
+  display: block;
+}
+
+.app-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #a1aabb;
+  font-size: 9px;
+  padding: 22px 0 5px;
+}
+
+.footer-dot {
+  color: #cbcfe0;
+  margin: 0 6px;
+}
+
+@media (max-width: 660px) {
+  .app-footer {
+    gap: 7px;
+    flex-wrap: wrap;
+  }
+  .app-footer {
+    font-size: 8px;
+  }
+}

@@ -1,0 +1,136 @@
+:host {
+  display: block;
+}
+
+.work-items-page-card {
+  margin-top: 0;
+}
+
+.filters-row {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  padding: 14px;
+  border-bottom: 1px solid #edf0f5;
+}
+
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 160px;
+  max-width: 390px;
+  border: 1px solid #e2e7ef;
+  border-radius: 7px;
+  padding: 0 10px;
+  height: 34px;
+  color: #9ca7b6;
+}
+
+.search-field > i {
+  font-size: 11px;
+}
+
+.search-field input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font-family: inherit;
+  color: #3b475b;
+  font-size: 10px;
+}
+
+.search-field input::placeholder {
+  color: #a8b0bd;
+}
+
+.filters-row select {
+  height: 34px;
+  border: 1px solid #e2e7ef;
+  background: #fff;
+  border-radius: 7px;
+  color: #647188;
+  font-family: inherit;
+  font-size: 10px;
+  padding: 0 9px;
+  outline: 0;
+}
+
+.filter-reset {
+  padding: 9px 10px;
+}
+
+.command-tip {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  background: #f1efff;
+  border: 1px solid #e4dfff;
+  border-radius: 9px;
+  padding: 13px;
+}
+
+.tip-icon {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: #fff;
+  color: #7a6be1;
+}
+
+.command-tip > div:nth-child(2) {
+  flex: 1;
+}
+
+.command-tip strong {
+  font-size: 11px;
+  color: #4c458b;
+}
+
+.command-tip p {
+  margin: 4px 0 0;
+  color: #8580b7;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+@media (max-width: 900px) {
+  .filters-row {
+    flex-wrap: wrap;
+  }
+  .search-field {
+    max-width: none;
+    flex-basis: 100%;
+  }
+  .filters-row select {
+    flex: 1;
+  }
+}
+
+@media (max-width: 660px) {
+  .command-tip {
+    flex-wrap: wrap;
+  }
+  .command-tip .button {
+    margin-left: 44px;
+  }
+  .filters-row {
+    padding: 10px;
+  }
+  .filters-row select {
+    min-width: 100px;
+  }
+  .filter-reset {
+    padding: 8px;
+  }
+}
+
+.work-items-delete-preview {
+  margin-bottom: 15px;
+}

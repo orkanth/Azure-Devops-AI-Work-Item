@@ -1,0 +1,94 @@
+<aside class="sidebar" aria-label="Application sidebar">
+  <div class="brand-lockup">
+    <div class="brand-mark" aria-hidden="true"><i class="pi pi-sparkles"></i></div>
+    <div class="brand-copy">
+      <div class="brand-name">WorkPilot <span>AI</span></div>
+      <div class="brand-caption">Azure DevOps assistant</div>
+    </div>
+  </div>
+
+  <!-- <div class="workspace-switcher" aria-label="Current workspace">
+    <div class="workspace-icon" aria-hidden="true"><i class="pi pi-box"></i></div>
+    <div class="workspace-copy">
+      <span class="muted-label">WORKSPACE</span>
+      <strong>DevFlow Prototype</strong>
+    </div>
+    <i class="pi pi-chevron-down switcher-chevron" aria-hidden="true"></i>
+  </div> -->
+
+  <div class="nav-section-label">WORKSPACE</div>
+  <nav class="side-nav" aria-label="Workspace navigation">
+    <a
+      class="nav-link"
+      routerLink="/"
+      routerLinkActive="active"
+      [routerLinkActiveOptions]="{ exact: true }"
+      ariaCurrentWhenActive="page"
+    >
+      <i class="pi pi-sparkles" aria-hidden="true"></i>
+      <span>AI command center</span>
+      <span class="nav-dot" aria-hidden="true"></span>
+    </a>
+
+    <a
+      class="nav-link"
+      routerLink="/work-items"
+      routerLinkActive="active"
+      ariaCurrentWhenActive="page"
+    >
+      <i class="pi pi-list-check" aria-hidden="true"></i>
+      <span>Work items</span>
+      <span class="nav-count">{{ workItemCount }}</span>
+    </a>
+
+    <a
+      class="nav-link"
+      routerLink="/documents"
+      routerLinkActive="active"
+      ariaCurrentWhenActive="page"
+    >
+      <i class="pi pi-file-import" aria-hidden="true"></i>
+      <span>Documents &amp; RAG</span>
+    </a>
+  </nav>
+
+  <div class="nav-section-label integrations-label">CONFIGURATION</div>
+  <nav class="side-nav" aria-label="Configuration navigation">
+    <a
+      class="nav-link"
+      routerLink="/integrations"
+      routerLinkActive="active"
+      ariaCurrentWhenActive="page"
+    >
+      <i class="pi pi-plug" aria-hidden="true"></i>
+      <span>Integrations</span>
+      <span class="status-dot" aria-hidden="true"></span>
+    </a>
+  </nav>
+
+  <div class="sidebar-spacer"></div>
+ <!-- <div class="sidebar-help">
+    <div class="help-icon" aria-hidden="true"><i class="pi pi-book"></i></div>
+     <div>
+      <strong>Getting started</strong>
+      <p>Try a prompt to create or update a work item.</p>
+      <button
+        type="button"
+        (click)="promptSelected.emit('Assign task #104 to Alex Morgan')"
+      >
+        Try an example <i class="pi pi-arrow-up-right" aria-hidden="true"></i>
+      </button>
+    </div> 
+  </div>-->
+
+  <div class="profile-row">
+    <div class="avatar avatar-purple" aria-hidden="true">RK</div>
+    <div class="profile-copy">
+      <strong>Prototype User</strong>
+      <span>Project administrator</span>
+    </div>
+    <button type="button" class="icon-button profile-menu" title="Profile menu">
+      <i class="pi pi-ellipsis-h" aria-hidden="true"></i>
+    </button>
+  </div>
+</aside>

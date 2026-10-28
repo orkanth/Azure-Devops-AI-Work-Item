@@ -14,6 +14,11 @@ async function bootstrap() {
 
   Logger.log(`Working directory: ${process.cwd()}`);
   Logger.log(`PORT loaded: ${JSON.stringify(process.env.PORT)}`);
+  app.enableCors({
+    origin: ['http://localhost:4200', 'http://127.0.0.1:4200'],
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
 
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);

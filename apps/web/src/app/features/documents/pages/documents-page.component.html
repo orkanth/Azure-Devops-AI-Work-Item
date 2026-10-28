@@ -1,0 +1,97 @@
+<section class="page-heading-row">
+  <div>
+    <div class="eyebrow">
+      <span class="eyebrow-sparkle"><i class="pi pi-file-import" aria-hidden="true"></i></span>
+      KNOWLEDGE BASE
+    </div>
+    <h1>Documents &amp; RAG</h1>
+    <p class="welcome-subtitle">
+      Add technical specifications to ground generated work items in your requirements.
+    </p>
+  </div>
+</section>
+
+<section class="document-layout">
+  <div class="document-main-card">
+    <div class="document-card-title">
+      <div class="command-icon"><i class="pi pi-cloud-upload" aria-hidden="true"></i></div>
+      <div>
+        <h2>Upload a technical document</h2>
+        <p>Supported formats: PDF and Word (.docx)</p>
+      </div>
+    </div>
+
+    <label class="drop-zone">
+      <input
+        type="file"
+        accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        (change)="onFileSelected($event)"
+      />
+      <span class="upload-icon"><i class="pi pi-upload" aria-hidden="true"></i></span>
+      <strong>{{ uploadedFileName || 'Drop your document here' }}</strong>
+      <span>{{ uploadedFileName ? 'File selected' : 'or browse files from your computer' }}</span>
+      <small>PDF or DOCX · File ingestion is not connected yet</small>
+    </label>
+
+    <div
+      *ngIf="uploadMessage"
+      class="upload-message"
+      [class.upload-warning]="!uploadedFileName"
+      role="status"
+    >
+      <i
+        class="pi"
+        aria-hidden="true"
+        [ngClass]="uploadedFileName ? 'pi-check-circle' : 'pi-info-circle'"
+      ></i>
+      {{ uploadMessage }}
+      <button type="button" *ngIf="uploadedFileName" (click)="clearUpload()">Remove</button>
+    </div>
+
+    <div class="pipeline-list">
+      <div>
+        <span class="pipeline-number">1</span>
+        <div>
+          <strong>Extract &amp; chunk</strong>
+          <p>Read document text and split it into searchable sections.</p>
+        </div>
+        <span class="coming-soon">NEXT</span>
+      </div>
+      <div>
+        <span class="pipeline-number">2</span>
+        <div>
+          <strong>Index in ChromaDB</strong>
+          <p>Create embeddings and store chunks for semantic retrieval.</p>
+        </div>
+        <span class="coming-soon">PLANNED</span>
+      </div>
+      <div>
+        <span class="pipeline-number">3</span>
+        <div>
+          <strong>Ground AI responses</strong>
+          <p>Retrieve relevant requirements when generating stories and tasks.</p>
+        </div>
+        <span class="coming-soon">PLANNED</span>
+      </div>
+    </div>
+  </div>
+
+  <aside class="document-side-card">
+    <div class="side-card-icon"><i class="pi pi-database" aria-hidden="true"></i></div>
+    <h3>Knowledge base status</h3>
+    <p>Your RAG pipeline will make the AI's suggestions more traceable to the specification.</p>
+    <div class="connection-row">
+      <span>Document extraction</span><span class="status-tag status-planned">Not connected</span>
+    </div>
+    <div class="connection-row">
+      <span>Embedding model</span><span class="status-tag status-planned">Not connected</span>
+    </div>
+    <div class="connection-row">
+      <span>ChromaDB</span><span class="status-tag status-planned">Not connected</span>
+    </div>
+    <div class="side-card-note">
+      <i class="pi pi-info-circle" aria-hidden="true"></i>
+      Uploading here currently selects the file only. It is not sent to a server.
+    </div>
+  </aside>
+</section>

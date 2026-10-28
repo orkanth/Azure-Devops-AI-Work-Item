@@ -1,9 +1,0 @@
-import { Controller, Get } from '@nestjs/common';
-
-@Controller('health')
-export class HealthController {
-  @Get()
-  getHealth(): { status: string; service: string } {
-    return { status: 'ok', service: 'azure-devops-ai-work-item-generator-api' };
-  }
-}
