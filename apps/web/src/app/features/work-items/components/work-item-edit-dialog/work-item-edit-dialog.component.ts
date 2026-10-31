@@ -63,6 +63,7 @@ export class WorkItemEditDialogComponent {
 
   @Output() closed = new EventEmitter<void>();
   @Output() saved = new EventEmitter<WorkItemEditResult>();
+  @Input() saving = false;
 
   editTitle = '';
   editDescription = '';

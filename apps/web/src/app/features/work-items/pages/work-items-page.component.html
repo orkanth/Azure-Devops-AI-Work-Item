@@ -1,15 +1,22 @@
 <section class="page-heading-row">
   <div>
     <div class="eyebrow">
-      <span class="eyebrow-sparkle"><i class="pi pi-list-check" aria-hidden="true"></i></span>
+      <span class="eyebrow-sparkle"
+        ><i class="pi pi-list-check" aria-hidden="true"></i
+      ></span>
       DELIVERY TRACKING
     </div>
     <h1>Work items</h1>
     <p class="welcome-subtitle">
-      Browse work items as a hierarchy, and edit, assign or remove items from your project.
+      Browse work items as a hierarchy, and edit, assign or remove items from
+      your project.
     </p>
   </div>
-  <button type="button" class="button button-primary" (click)="startCreatePrompt()">
+  <button
+    type="button"
+    class="button button-primary"
+    (click)="startCreatePrompt()"
+  >
     <i class="pi pi-plus" aria-hidden="true"></i> Create with AI
   </button>
 </section>
@@ -35,9 +42,8 @@
       <div class="delete-modal-icon">
         <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
       </div>
-      
-      <div class="section-kicker">DELETE WORK ITEM</div>
 
+      <div class="section-kicker">DELETE WORK ITEM</div>
 
       <button
         type="button"
@@ -51,10 +57,13 @@
 
     <!-- Modal Content -->
     <div class="delete-modal-content">
-      <h2 id="delete-modal-title">Are you sure you want to delete this item?</h2>
+      <h2 id="delete-modal-title">
+        Are you sure you want to delete this item?
+      </h2>
 
       <p id="delete-modal-description">
-        You are about to delete the following work item from your Azure DevOps project.
+        You are about to delete the following work item from your Azure DevOps
+        project.
       </p>
 
       <div class="delete-item-preview">
@@ -70,17 +79,14 @@
       <div class="delete-warning">
         <i class="pi pi-info-circle" aria-hidden="true"></i>
         <p>
-          The work item will be moved to the Azure DevOps Recycle Bin.
-          You can restore it from there if required.
+          The work item will be moved to the Azure DevOps Recycle Bin. You can
+          restore it from there if required.
         </p>
       </div>
 
       <!-- Explicit Confirmation -->
       <label class="delete-confirmation">
-        <input
-          type="checkbox"
-          [(ngModel)]="deleteAcknowledged"
-        />
+        <input type="checkbox" [(ngModel)]="deleteAcknowledged" />
         <span>
           I understand and confirm that I want to delete this work item.
         </span>
@@ -100,11 +106,23 @@
       <button
         type="button"
         class="button button-danger"
-        [disabled]="!deleteAcknowledged"
+        [disabled]="!deleteAcknowledged || deletingItemId() === deleteTarget.id"
         (click)="confirmDelete()"
       >
-        <i class="pi pi-trash" aria-hidden="true"></i>
-        Delete work item
+        <i
+          class="pi"
+          [ngClass]="
+            deletingItemId() === deleteTarget.id
+              ? 'pi-spinner pi-spin'
+              : 'pi-trash'
+          "
+        ></i>
+
+        {{
+          deletingItemId() === deleteTarget.id
+            ? 'Deleting...'
+            : 'Delete work item'
+        }}
       </button>
     </div>
   </section>
@@ -140,18 +158,36 @@
       <option *ngFor="let state of workItemStates">{{ state }}</option>
     </select>
 
-    <button type="button" class="button button-secondary filter-reset" (click)="resetFilters()">
+    <button
+      type="button"
+      class="button button-secondary filter-reset"
+      (click)="resetFilters()"
+    >
       <i class="pi pi-filter-slash" aria-hidden="true"></i> Reset filters
     </button>
   </div>
 
   <div class="table-scroll tree-table-scroll">
+    <div
+      *ngIf="isLoading()"
+      class="table-loading-state"
+      role="status"
+      aria-live="polite"
+    >
+      <i class="pi pi-spinner pi-spin"></i>
+      <strong>Loading work items...</strong>
+      <span>Fetching the latest data from Azure DevOps.</span>
+    </div>
     <p-treetable
-      *ngIf="treeNodes().length > 0; else noWorkItems"
+      *ngIf="!isLoading() && treeNodes().length > 0; else noWorkItems"
       class="work-items-tree"
       [value]="treeNodes()"
       [scrollable]="true"
-      [tableStyle]="{ 'min-width': '72rem', width: '100%', 'table-layout': 'fixed' }"
+      [tableStyle]="{
+        'min-width': '72rem',
+        width: '100%',
+        'table-layout': 'fixed',
+      }"
     >
       <ng-template #header>
         <tr>
@@ -185,7 +221,10 @@
             </div>
           </td>
           <td class="parent-cell tree-parent-column">
-            <span class="parent-cell-text" [attr.title]="parentTitle(rowData.parentId)">
+            <span
+              class="parent-cell-text"
+              [attr.title]="parentTitle(rowData.parentId)"
+            >
               {{ parentTitle(rowData.parentId) }}
             </span>
           </td>
@@ -198,7 +237,11 @@
             <div class="assignee">
               <span
                 class="avatar avatar-xs"
-                [ngClass]="rowData.assignedTo === 'Unassigned' ? 'avatar-unassigned' : 'avatar-blue'"
+                [ngClass]="
+                  rowData.assignedTo === 'Unassigned'
+                    ? 'avatar-unassigned'
+                    : 'avatar-blue'
+                "
               >
                 {{ initials(rowData.assignedTo) }}
               </span>
@@ -206,8 +249,12 @@
             </div>
           </td>
           <td class="tree-priority-column">
-            <span class="priority-text" [ngClass]="'priority-' + rowData.priority.toLowerCase()">
-              <i class="pi pi-flag-fill" aria-hidden="true"></i>{{ rowData.priority }}
+            <span
+              class="priority-text"
+              [ngClass]="'priority-' + rowData.priority.toLowerCase()"
+            >
+              <i class="pi pi-flag-fill" aria-hidden="true"></i
+              >{{ rowData.priority }}
             </span>
           </td>
           <td class="tree-actions-column">
@@ -225,7 +272,9 @@
                 type="button"
                 class="icon-button row-action danger-action"
                 title="Prepare delete"
-                [attr.aria-label]="'Prepare delete for work item #' + rowData.id"
+                [attr.aria-label]="
+                  'Prepare delete for work item #' + rowData.id
+                "
                 (click)="prepareDelete(rowData)"
               >
                 <i class="pi pi-trash" aria-hidden="true"></i>
@@ -237,7 +286,7 @@
     </p-treetable>
 
     <ng-template #noWorkItems>
-      <div class="empty-cell tree-empty-state">
+      <div *ngIf="!isLoading()" class="empty-cell tree-empty-state">
         <i class="pi pi-search" aria-hidden="true"></i>
         <strong>No work items match your filters</strong>
         <span>Try a different search or reset the filters.</span>
@@ -247,8 +296,10 @@
 
   <div class="table-footer">
     <span>
-      Showing {{ visibleTreeNodeCount() }} items in the hierarchy
-      ({{ matchingItems().length }} matched · {{ items().length }} total)
+      Showing {{ visibleTreeNodeCount() }} items in the hierarchy ({{
+        matchingItems().length
+      }}
+      matched · {{ items().length }} total)
     </span>
     <button *ngIf="supportsDemoReset" type="button" (click)="resetDemo()">
       <i class="pi pi-refresh" aria-hidden="true"></i> Reset demo data
@@ -260,9 +311,16 @@
   <div class="tip-icon"><i class="pi pi-sparkles" aria-hidden="true"></i></div>
   <div>
     <strong>Want to make a change by prompt?</strong>
-    <p>Try “Assign task #104 to Alex Morgan” or “Move #105 to Done” in the AI command center.</p>
+    <p>
+      Try “Assign task #104 to Alex Morgan” or “Move #105 to Done” in the AI
+      command center.
+    </p>
   </div>
-  <button type="button" class="button button-secondary" (click)="navigateToCommands()">
+  <button
+    type="button"
+    class="button button-secondary"
+    (click)="navigateToCommands()"
+  >
     Open AI commands <i class="pi pi-arrow-right" aria-hidden="true"></i>
   </button>
 </div>
@@ -272,6 +330,7 @@
   [workItemTypes]="workItemTypes"
   [workItemStates]="workItemStates"
   [priorities]="priorities"
+  [saving]="updatingItemId() !== null"
   (closed)="closeEdit()"
   (saved)="saveEdit($event)"
 ></app-work-item-edit-dialog>

@@ -29,7 +29,6 @@
     </div>
 
     <form (ngSubmit)="submit()">
-
       <div class="field-label">
         Work item type
         <div class="readonly-field">{{ current.type }}</div>
@@ -113,8 +112,13 @@
           Cancel
         </button>
 
-        <button type="submit" class="button button-primary">
-          <i class="pi pi-check"></i> Save changes
+        <button type="submit" class="button button-primary" [disabled]="saving">
+          <i
+            class="pi"
+            [ngClass]="saving ? 'pi-spinner pi-spin' : 'pi-check'"
+          ></i>
+
+          {{ saving ? 'Saving...' : 'Save changes' }}
         </button>
       </div>
     </form>

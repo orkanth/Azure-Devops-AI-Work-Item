@@ -1,5 +1,12 @@
-import { CommonModule } from '@angular/common'; 
-import { Component, computed, effect, inject, signal, OnInit } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+  OnInit,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { TreeNode } from 'primeng/api';
 import { TreeTableModule } from 'primeng/treetable';
@@ -21,7 +28,12 @@ import { buildWorkItemTree } from '../utils/work-item-tree.util';
 @Component({
   selector: 'app-work-items-page',
   standalone: true,
-  imports: [CommonModule, FormsModule, TreeTableModule, WorkItemEditDialogComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    TreeTableModule,
+    WorkItemEditDialogComponent,
+  ],
   templateUrl: './work-items-page.component.html',
   styleUrl: './work-items-page.component.css',
 })
@@ -29,6 +41,12 @@ export class WorkItemsPageComponent implements OnInit {
   private readonly workItemStore = inject(WORK_ITEM_STORE);
   private readonly feedback = inject(AppFeedbackService);
   private readonly navigation = inject(WorkspaceNavigationService);
+  // Loading states
+  readonly isLoading = signal(true);
+  readonly updatingItemId = signal<number | null>(null);
+  readonly deletingItemId = signal<number | null>(null);
+
+  readonly actionError = signal('');
 
   constructor() {
     effect(() => {
@@ -41,9 +59,21 @@ export class WorkItemsPageComponent implements OnInit {
   }
 
   readonly items = this.workItemStore.items;
-  readonly supportsDemoReset = typeof this.workItemStore.resetDemoData === 'function';
-  readonly workItemTypes: WorkItemType[] = ['Epic', 'Feature', 'User Story', 'Task', 'Bug'];
-  readonly workItemStates: WorkItemState[] = ['New', 'Active', 'Resolved', 'Closed'];
+  readonly supportsDemoReset =
+    typeof this.workItemStore.resetDemoData === 'function';
+  readonly workItemTypes: WorkItemType[] = [
+    'Epic',
+    'Feature',
+    'User Story',
+    'Task',
+    'Bug',
+  ];
+  readonly workItemStates: WorkItemState[] = [
+    'New',
+    'Active',
+    'Resolved',
+    'Closed',
+  ];
   readonly priorities: WorkItemPriority[] = ['Low', 'Medium', 'High'];
 
   readonly searchTerm = signal('');
@@ -57,9 +87,12 @@ export class WorkItemsPageComponent implements OnInit {
 
     return this.items().filter((item) => {
       const searchableText = `${item.id} ${item.title} ${item.assignedTo} ${item.type} ${item.state}`;
-      const matchesSearch = !query || searchableText.toLowerCase().includes(query);
-      const matchesType = typeFilter === 'All types' || item.type === typeFilter;
-      const matchesState = stateFilter === 'All states' || item.state === stateFilter;
+      const matchesSearch =
+        !query || searchableText.toLowerCase().includes(query);
+      const matchesType =
+        typeFilter === 'All types' || item.type === typeFilter;
+      const matchesState =
+        stateFilter === 'All states' || item.state === stateFilter;
 
       return matchesSearch && matchesType && matchesState;
     });
@@ -70,24 +103,30 @@ export class WorkItemsPageComponent implements OnInit {
     buildWorkItemTree(this.items(), this.matchingItems()),
   );
 
-  readonly visibleTreeNodeCount = computed(() => countTreeNodes(this.treeNodes()));
+  readonly visibleTreeNodeCount = computed(() =>
+    countTreeNodes(this.treeNodes()),
+  );
 
   editingItem: WorkItem | null = null;
   deleteTarget: WorkItem | null = null;
   deleteAcknowledged = false;
 
   async ngOnInit(): Promise<void> {
-  try {
-    await this.workItemStore.refresh();
-  } catch (error) {
-    console.error('Failed to load Azure DevOps work items:', error);
+    this.isLoading.set(true);
 
-    this.feedback.show(
-      'Unable to load work items from Azure DevOps.',
-      'error',
-    );
+    try {
+      await this.workItemStore.refresh();
+    } catch (error) {
+      console.error('Failed to load Azure DevOps work items:', error);
+
+      this.feedback.show(
+        'Unable to load work items from Azure DevOps.',
+        'error',
+      );
+    } finally {
+      this.isLoading.set(false);
+    }
   }
-}
   startCreatePrompt(): void {
     this.navigation.navigateWithPrompt('Create a task for ');
   }
@@ -104,18 +143,25 @@ export class WorkItemsPageComponent implements OnInit {
     this.editingItem = null;
   }
 
-  async saveEdit(result: WorkItemEditResult): Promise<void> {
-    try {
-      await this.workItemStore.update(result.id, result.changes);
-      this.closeEdit();
-      this.feedback.show(
-        'Work item updated.',
-        'success',
-      );
-    } catch {
-      this.feedback.show('The work item could not be updated. Please try again.', 'error');
-    }
+  async saveEdit(event: WorkItemEditResult): Promise<void> {
+  if (this.updatingItemId() !== null) return;
+
+  this.updatingItemId.set(event.id);
+  this.actionError.set('');
+
+  try {
+    await this.workItemStore.update(event.id, event.changes);
+
+    this.closeEdit();
+  } catch (error) {
+    console.error('Failed to update work item:', error);
+    this.actionError.set(
+      'Unable to update the work item. Please try again.',
+    );
+  } finally {
+    this.updatingItemId.set(null);
   }
+}
 
   prepareDelete(item: WorkItem): void {
     this.deleteTarget = { ...item };
@@ -129,20 +175,27 @@ export class WorkItemsPageComponent implements OnInit {
   }
 
   async confirmDelete(): Promise<void> {
-    const target = this.deleteTarget;
-    if (!target || !this.deleteAcknowledged) return;
+  const target = this.deleteTarget;
 
-    try {
-      await this.workItemStore.delete(target.id);
-      this.cancelDelete();
-      this.feedback.show(
-        `Deleted demo work item #${target.id}: ${target.title}. Child items were kept and detached from the deleted parent. Azure DevOps is not connected yet.`,
-        'success',
-      );
-    } catch {
-      this.feedback.show('The work item could not be deleted. Please try again.', 'error');
-    }
+  if (!target || !this.deleteAcknowledged) return;
+  if (this.deletingItemId() !== null) return;
+
+  this.deletingItemId.set(target.id);
+  this.actionError.set('');
+
+  try {
+    await this.workItemStore.delete(target.id);
+
+    this.cancelDelete();
+  } catch (error) {
+    console.error('Failed to delete work item:', error);
+    this.actionError.set(
+      'Unable to delete the work item. Please try again.',
+    );
+  } finally {
+    this.deletingItemId.set(null);
   }
+}
 
   resetFilters(): void {
     this.searchTerm.set('');
@@ -186,8 +239,25 @@ export class WorkItemsPageComponent implements OnInit {
     const parent = this.items().find((item) => item.id === parentId);
     return parent ? `#${parent.id} ${parent.title}` : `#${parentId}`;
   }
+
+  async loadWorkItems(): Promise<void> {
+    this.isLoading.set(true);
+    this.actionError.set('');
+
+    try {
+      await this.workItemStore.refresh();
+    } catch (error) {
+      console.error('Failed to load work items:', error);
+      this.actionError.set('Unable to load work items. Please try again.');
+    } finally {
+      this.isLoading.set(false);
+    }
+  }
 }
 
 function countTreeNodes(nodes: TreeNode[]): number {
-  return nodes.reduce((count, node) => count + 1 + countTreeNodes(node.children ?? []), 0);
+  return nodes.reduce(
+    (count, node) => count + 1 + countTreeNodes(node.children ?? []),
+    0,
+  );
 }
