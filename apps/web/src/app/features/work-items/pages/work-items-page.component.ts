@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import {
   Component,
   computed,
+  DestroyRef,
   effect,
   inject,
   signal,
@@ -24,6 +25,9 @@ import {
   type WorkItemEditResult,
 } from '../components/work-item-edit-dialog/work-item-edit-dialog.component';
 import { buildWorkItemTree } from '../utils/work-item-tree.util';
+import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { WorkItemsQuery } from '../../../shared/models/work-items-query.model';
 
 @Component({
   selector: 'app-work-items-page',
@@ -48,14 +52,28 @@ export class WorkItemsPageComponent implements OnInit {
 
   readonly actionError = signal('');
 
+  readonly first = signal(0);
+  readonly pageSize = signal(10);
+
+  readonly totalRecords = this.workItemStore.totalRecords;
+
+  readonly sortBy = signal<'id' | 'title' | 'state' | 'priority'>('id');
+  readonly sortOrder = signal<'ASC' | 'DESC'>('DESC');
+
+  private readonly searchChanges$ = new Subject<string>();
+  private readonly destroyRef = inject(DestroyRef);
+
   constructor() {
-    effect(() => {
-      const item = this.navigation.editRequest();
-      if (item) {
-        this.startEdit(item);
-        this.navigation.clearEditRequest();
-      }
-    });
+    this.searchChanges$
+      .pipe(
+        debounceTime(350),
+        distinctUntilChanged(),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe(() => {
+        this.first.set(0);
+        void this.loadWorkItems();
+      });
   }
 
   readonly items = this.workItemStore.items;
@@ -144,24 +162,22 @@ export class WorkItemsPageComponent implements OnInit {
   }
 
   async saveEdit(event: WorkItemEditResult): Promise<void> {
-  if (this.updatingItemId() !== null) return;
+    if (this.updatingItemId() !== null) return;
 
-  this.updatingItemId.set(event.id);
-  this.actionError.set('');
+    this.updatingItemId.set(event.id);
+    this.actionError.set('');
 
-  try {
-    await this.workItemStore.update(event.id, event.changes);
+    try {
+      await this.workItemStore.update(event.id, event.changes);
 
-    this.closeEdit();
-  } catch (error) {
-    console.error('Failed to update work item:', error);
-    this.actionError.set(
-      'Unable to update the work item. Please try again.',
-    );
-  } finally {
-    this.updatingItemId.set(null);
+      this.closeEdit();
+    } catch (error) {
+      console.error('Failed to update work item:', error);
+      this.actionError.set('Unable to update the work item. Please try again.');
+    } finally {
+      this.updatingItemId.set(null);
+    }
   }
-}
 
   prepareDelete(item: WorkItem): void {
     this.deleteTarget = { ...item };
@@ -175,32 +191,35 @@ export class WorkItemsPageComponent implements OnInit {
   }
 
   async confirmDelete(): Promise<void> {
-  const target = this.deleteTarget;
+    const target = this.deleteTarget;
 
-  if (!target || !this.deleteAcknowledged) return;
-  if (this.deletingItemId() !== null) return;
+    if (!target || !this.deleteAcknowledged) return;
+    if (this.deletingItemId() !== null) return;
 
-  this.deletingItemId.set(target.id);
-  this.actionError.set('');
+    this.deletingItemId.set(target.id);
+    this.actionError.set('');
 
-  try {
-    await this.workItemStore.delete(target.id);
+    try {
+      await this.workItemStore.delete(target.id);
 
-    this.cancelDelete();
-  } catch (error) {
-    console.error('Failed to delete work item:', error);
-    this.actionError.set(
-      'Unable to delete the work item. Please try again.',
-    );
-  } finally {
-    this.deletingItemId.set(null);
+      this.cancelDelete();
+    } catch (error) {
+      console.error('Failed to delete work item:', error);
+      this.actionError.set('Unable to delete the work item. Please try again.');
+    } finally {
+      this.deletingItemId.set(null);
+    }
   }
-}
 
   resetFilters(): void {
     this.searchTerm.set('');
     this.typeFilter.set('All types');
     this.stateFilter.set('All states');
+    this.sortBy.set('id');
+    this.sortOrder.set('DESC');
+    this.first.set(0);
+
+    void this.loadWorkItems();
   }
 
   resetDemo(): void {
@@ -242,16 +261,72 @@ export class WorkItemsPageComponent implements OnInit {
 
   async loadWorkItems(): Promise<void> {
     this.isLoading.set(true);
-    this.actionError.set('');
+
+    const query: WorkItemsQuery = {
+      page: Math.floor(this.first() / this.pageSize()) + 1,
+      pageSize: this.pageSize(),
+      search: this.searchTerm().trim() || undefined,
+      type: this.typeFilter() === 'All types' ? undefined : this.typeFilter(),
+      state:
+        this.stateFilter() === 'All states' ? undefined : this.stateFilter(),
+      sortBy: this.sortBy(),
+      sortOrder: this.sortOrder(),
+    };
 
     try {
-      await this.workItemStore.refresh();
+      await this.workItemStore.refresh(query);
     } catch (error) {
-      console.error('Failed to load work items:', error);
-      this.actionError.set('Unable to load work items. Please try again.');
+      console.error('Failed to load Azure DevOps work items:', error);
+
+      this.feedback.show(
+        'Unable to load work items from Azure DevOps.',
+        'error',
+      );
     } finally {
       this.isLoading.set(false);
     }
+  }
+
+  resetPage(): void {
+    this.first.set(0);
+  }
+
+  onSearchChange(value: string): void {
+    this.searchTerm.set(value);
+    this.searchChanges$.next(value);
+  }
+
+  onTypeFilterChange(value: string): void {
+    this.typeFilter.set(value);
+    this.first.set(0);
+    void this.loadWorkItems();
+  }
+
+  onStateFilterChange(value: string): void {
+    this.stateFilter.set(value);
+    this.first.set(0);
+    void this.loadWorkItems();
+  }
+
+  onPageChange(event: { first?: number; rows?: number }): void {
+    this.first.set(event.first ?? 0);
+    this.pageSize.set(event.rows ?? 10);
+
+    void this.loadWorkItems();
+  }
+
+  onSortByChange(value: 'id' | 'title' | 'state' | 'priority'): void {
+    this.sortBy.set(value);
+    this.first.set(0);
+
+    void this.loadWorkItems();
+  }
+
+  onSortOrderChange(value: 'ASC' | 'DESC'): void {
+    this.sortOrder.set(value);
+    this.first.set(0);
+
+    void this.loadWorkItems();
   }
 }
 

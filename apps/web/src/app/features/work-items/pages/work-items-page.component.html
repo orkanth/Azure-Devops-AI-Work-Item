@@ -134,7 +134,7 @@
       <input
         type="search"
         [ngModel]="searchTerm()"
-        (ngModelChange)="searchTerm.set($event)"
+        (ngModelChange)="onSearchChange($event)"
         aria-label="Search work items"
         placeholder="Search by title, ID, assignee or state"
       />
@@ -142,7 +142,7 @@
 
     <select
       [ngModel]="typeFilter()"
-      (ngModelChange)="typeFilter.set($event)"
+      (ngModelChange)="onTypeFilterChange($event)"
       aria-label="Filter by work item type"
     >
       <option>All types</option>
@@ -151,11 +151,30 @@
 
     <select
       [ngModel]="stateFilter()"
-      (ngModelChange)="stateFilter.set($event)"
+      (ngModelChange)="onStateFilterChange($event)"
       aria-label="Filter by state"
     >
       <option>All states</option>
       <option *ngFor="let state of workItemStates">{{ state }}</option>
+    </select>
+    <select
+      [ngModel]="sortBy()"
+      (ngModelChange)="onSortByChange($event)"
+      aria-label="Sort work items by"
+    >
+      <option value="id">ID</option>
+      <option value="title">Title</option>
+      <option value="state">State</option>
+      <option value="priority">Priority</option>
+    </select>
+
+    <select
+      [ngModel]="sortOrder()"
+      (ngModelChange)="onSortOrderChange($event)"
+      aria-label="Sort direction"
+    >
+      <option value="DESC">Descending</option>
+      <option value="ASC">Ascending</option>
     </select>
 
     <button
@@ -183,6 +202,14 @@
       class="work-items-tree"
       [value]="treeNodes()"
       [scrollable]="true"
+      [paginator]="true"
+      [first]="first()"
+      [rows]="pageSize()"
+      [rowsPerPageOptions]="[10, 20, 50]"
+      [showCurrentPageReport]="true"
+      currentPageReportTemplate="Showing {first} to {last} of {totalRecords} root items"
+      [alwaysShowPaginator]="false"
+      (onPage)="onPageChange($event)"
       [tableStyle]="{
         'min-width': '72rem',
         width: '100%',
@@ -191,8 +218,14 @@
     >
       <ng-template #header>
         <tr>
-          <th class="tree-id-column">ID</th>
-          <th class="tree-work-item-column">WORK ITEM</th>
+          <th class="tree-id-column" ttSortableColumn="id">
+            ID
+            <p-treetable-sort-icon field="id"></p-treetable-sort-icon>
+          </th>
+          <th class="tree-work-item-column" ttSortableColumn="title">
+            WORK ITEM
+            <p-treetable-sort-icon field="title"></p-treetable-sort-icon>
+          </th>
           <th class="tree-parent-column">PARENT</th>
           <th class="tree-state-column">STATE</th>
           <th class="tree-assigned-column">ASSIGNED TO</th>
@@ -283,8 +316,27 @@
           </td>
         </tr>
       </ng-template>
-    </p-treetable>
+      <div class="table-footer">
+        <span>
+          Showing {{ matchingItems().length }} matching items ·
+          {{ totalRecords() }} total results
+        </span>
 
+        <button *ngIf="supportsDemoReset" type="button" (click)="resetDemo()">
+          <i class="pi pi-refresh" aria-hidden="true"></i>
+          Reset demo data
+        </button>
+      </div>
+    </p-treetable>
+    <p-paginator
+      *ngIf="!isLoading() && totalRecords() > 0"
+      [first]="first()"
+      [rows]="pageSize()"
+      [totalRecords]="totalRecords()"
+      [rowsPerPageOptions]="[10, 20, 50]"
+      (onPageChange)="onPageChange($event)"
+    >
+    </p-paginator>
     <ng-template #noWorkItems>
       <div *ngIf="!isLoading()" class="empty-cell tree-empty-state">
         <i class="pi pi-search" aria-hidden="true"></i>

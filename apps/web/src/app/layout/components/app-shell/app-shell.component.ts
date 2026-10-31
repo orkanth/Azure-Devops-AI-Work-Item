@@ -1,7 +1,12 @@
 import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActivatedRoute, NavigationEnd, Router, RouterOutlet } from '@angular/router';
+import {
+  ActivatedRoute,
+  NavigationEnd,
+  Router,
+  RouterOutlet,
+} from '@angular/router';
 import { filter, startWith } from 'rxjs';
 import { AppFeedbackService } from '../../../core/services/app-feedback.service';
 import { WORK_ITEM_STORE } from '../../../features/work-items/data-access/work-item-store';
@@ -38,12 +43,17 @@ export class AppShellComponent {
 
   constructor() {
     void this.workItemService.refresh().catch(() => {
-      this.feedback.show('Workspace data could not be loaded. Please try again.', 'error');
+      this.feedback.show(
+        'Workspace data could not be loaded. Please try again.',
+        'error',
+      );
     });
 
     this.router.events
       .pipe(
-        filter((event): event is NavigationEnd => event instanceof NavigationEnd),
+        filter(
+          (event): event is NavigationEnd => event instanceof NavigationEnd,
+        ),
         startWith(null),
         takeUntilDestroyed(),
       )
@@ -61,11 +71,16 @@ export class AppShellComponent {
   }
 
   private syncPageTitle(): void {
-    let route = this.activatedRoute;
+    let route = this.router.routerState.snapshot.root;
+
     while (route.firstChild) {
       route = route.firstChild;
     }
 
-    this.pageTitle.set(route.snapshot.data['pageTitle'] ?? 'Workspace');
+    const title = route.data?.['pageTitle'];
+
+    this.pageTitle.set(
+      typeof title === 'string' && title.trim() ? title : 'AI command center',
+    );
   }
 }

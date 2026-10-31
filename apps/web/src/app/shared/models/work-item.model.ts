@@ -22,6 +22,7 @@ export interface WorkItem {
   parentId?: number;
   updatedAt: string;
   url?: string;
+  isContextOnly?: boolean;
 }
 
 export type WorkItemActionKind = 'create' | 'update' | 'assign' | 'delete';

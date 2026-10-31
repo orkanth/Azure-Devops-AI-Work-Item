@@ -1,5 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
+import { WorkItemsQuery } from '../../../shared/models/work-items-query.model';
 
 import {
   ApiService,
@@ -14,10 +15,7 @@ import {
   WorkItemType,
 } from '../../../shared/models/work-item.model';
 
-import type {
-  WorkItemStore,
-  WorkItemCounts,
-} from './work-item-store';
+import type { WorkItemStore, WorkItemCounts } from './work-item-store';
 
 @Injectable()
 export class AzureDevOpsWorkItemStore implements WorkItemStore {
@@ -26,45 +24,67 @@ export class AzureDevOpsWorkItemStore implements WorkItemStore {
   private readonly _items = signal<WorkItem[]>([]);
 
   readonly items = this._items.asReadonly();
+  private readonly _totalRecords = signal(0);
 
+  readonly totalRecords = this._totalRecords.asReadonly();
+  private currentQuery: WorkItemsQuery = {
+    page: 1,
+    pageSize: 10,
+    sortBy: 'id',
+    sortOrder: 'DESC',
+  };
+  
   async refresh(): Promise<void> {
-    const response = await firstValueFrom(
-      this.apiService.getWorkItems(),
-    );
+  const response = await firstValueFrom(
+    this.apiService.getWorkItems({
+      page: 1,
+      pageSize: 200,
+      sortBy: 'id',
+      sortOrder: 'DESC',
+    }),
+  );
 
-    this._items.set(
-      response.map((item) => this.mapWorkItem(item)),
-    );
+  if (!Array.isArray(response)) {
+    console.error('Unexpected API response:', response);
+    throw new Error('Invalid work items API response.');
   }
 
-  async create(
-    item: Omit<WorkItem, 'id' | 'updatedAt'>,
-  ): Promise<WorkItem> {
-    const payload: CreateApiWorkItemRequest = {
-      type: item.type,
-      title: item.title,
-      description: item.description,
-      acceptanceCriteria: item.acceptanceCriteria,
-      assignedTo:
-        item.assignedToEmail ||
-        (item.assignedTo !== 'Unassigned' ? item.assignedTo : undefined),
-      priority: item.priority,
-      parentId: item.parentId,
-    };
+  this._items.set(
+    response.map((item) => this.mapWorkItem(item)),
+  );
 
-    const response = await firstValueFrom(
-      this.apiService.createWorkItem(payload),
-    );
+  this._totalRecords.set(response.length);
+}
+  
+  async create(item: Omit<WorkItem, 'id' | 'updatedAt'>): Promise<WorkItem> {
+  const payload: CreateApiWorkItemRequest = {
+    type: item.type,
+    title: item.title,
+    description: item.description,
+    acceptanceCriteria: item.acceptanceCriteria,
+    assignedTo:
+      item.assignedToEmail ||
+      (item.assignedTo !== 'Unassigned' ? item.assignedTo : undefined),
+    priority: item.priority,
+    parentId: item.parentId,
+  };
 
-    const created = this.mapWorkItem(response);
+  // Call POST instead of GET.
+  const response = await firstValueFrom(
+    this.apiService.createWorkItem(payload),
+  );
 
-    this._items.update((current) => [
-      created,
-      ...current.filter((existing) => existing.id !== created.id),
-    ]);
+  // POST returns one work item, not a paginated collection.
+  const created = this.mapWorkItem(response);
 
-    return created;
-  }
+  // Update local state only after Azure DevOps confirms creation.
+  this._items.update((current) => [
+    created,
+    ...current.filter((existing) => existing.id !== created.id),
+  ]);
+
+  return created;
+}
 
   async update(
     id: number,
@@ -117,14 +137,10 @@ export class AzureDevOpsWorkItemStore implements WorkItemStore {
   }
 
   async delete(id: number): Promise<void> {
-    await firstValueFrom(
-      this.apiService.deleteWorkItem(id),
-    );
+    await firstValueFrom(this.apiService.deleteWorkItem(id));
 
     // Remove locally only after Azure DevOps confirms deletion.
-    this._items.update((current) =>
-      current.filter((item) => item.id !== id),
-    );
+    this._items.update((current) => current.filter((item) => item.id !== id));
 
     // Refresh because deleting a parent can affect child relationships.
     await this.refresh();
@@ -134,7 +150,7 @@ export class AzureDevOpsWorkItemStore implements WorkItemStore {
     return {
       id: item.id,
       title: item.title,
-      type: this.mapType(item.type),
+      type: item.type,
       description: item.description,
       acceptanceCriteria: item.acceptanceCriteria,
       state: item.state,
@@ -144,6 +160,7 @@ export class AzureDevOpsWorkItemStore implements WorkItemStore {
       parentId: item.parentId,
       updatedAt: item.updatedAt,
       url: item.url,
+      isContextOnly: item.isContextOnly ?? false,
     };
   }
 

@@ -8,6 +8,23 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { UpdateWorkItemDto } from '../work-items/dto/update-work-item.dto';
 
+export interface AzureDevOpsWorkItemsQuery {
+  page: number;
+  pageSize: number;
+  search?: string;
+  type?: string;
+  state?: string;
+  sortBy?: 'id' | 'title' | 'state' | 'priority';
+  sortOrder?: 'ASC' | 'DESC';
+}
+
+export interface AzureDevOpsWorkItemsPage {
+  items: AzureDevOpsWorkItem[];
+  totalRecords: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface AzureDevOpsWorkItem {
   id: number;
   url: string;
@@ -16,6 +33,7 @@ export interface AzureDevOpsWorkItem {
     rel: string;
     url: string;
   }>;
+  isContextOnly?: boolean;
 }
 interface AzureDevOpsGraphUser {
   displayName?: string;
@@ -436,6 +454,44 @@ export class AzureDevOpsService {
       method: 'PATCH',
       body: JSON.stringify(patch),
     });
+  }
+
+  private async getWorkItemsByIds(
+    ids: number[],
+    baseUrl: string,
+    headers: Record<string, string>,
+    apiVersion: string,
+  ): Promise<AzureDevOpsWorkItem[]> {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const params = new URLSearchParams({
+      ids: ids.join(','),
+      $expand: 'relations',
+      'api-version': apiVersion,
+    });
+
+    const url = `${baseUrl}/_apis/wit/workitems?${params.toString()}`;
+
+    const response = await this.requestJson<WorkItemsResponse>(url, headers, {
+      method: 'GET',
+    });
+
+    return response.value ?? [];
+  }
+  private getParentId(item: AzureDevOpsWorkItem): number | undefined {
+    const parentRelation = item.relations?.find(
+      (relation) => relation.rel === 'System.LinkTypes.Hierarchy-Reverse',
+    );
+
+    const match = parentRelation?.url.match(/\/workItems\/(\d+)\/?$/i);
+
+    return match?.[1] ? Number(match[1]) : undefined;
+  }
+
+  private escapeWiql(value: string): string {
+    return value.replace(/'/g, "''");
   }
 
   async deleteWorkItem(id: number): Promise<void> {

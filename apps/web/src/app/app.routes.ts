@@ -23,12 +23,13 @@ export const appRoutes: Routes = [
       },
       {
         path: 'work-items',
-        title: 'WorkPilot AI | Work Items',
-        data: { pageTitle: 'Work items' },
         loadComponent: () =>
           import('./features/work-items/pages/work-items-page.component').then(
-            ({ WorkItemsPageComponent }) => WorkItemsPageComponent,
+            (m) => m.WorkItemsPageComponent,
           ),
+        data: {
+          pageTitle: 'Work Items',
+        },
       },
       {
         path: 'documents',
@@ -44,9 +45,9 @@ export const appRoutes: Routes = [
         title: 'WorkPilot AI | Integrations',
         data: { pageTitle: 'Integrations' },
         loadComponent: () =>
-          import('./features/integrations/pages/integrations-page.component').then(
-            ({ IntegrationsPageComponent }) => IntegrationsPageComponent,
-          ),
+          import(
+            './features/integrations/pages/integrations-page.component'
+          ).then(({ IntegrationsPageComponent }) => IntegrationsPageComponent),
       },
     ],
   },

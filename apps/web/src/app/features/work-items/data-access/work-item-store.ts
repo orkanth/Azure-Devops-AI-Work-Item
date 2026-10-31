@@ -1,5 +1,7 @@
 import { InjectionToken, Signal } from '@angular/core';
+
 import { WorkItem } from '../../../shared/models/work-item.model';
+import { WorkItemsQuery } from '../../../shared/models/work-items-query.model';
 
 export interface WorkItemCounts {
   total: number;
@@ -11,9 +13,14 @@ export interface WorkItemCounts {
 export interface WorkItemStore {
   readonly items: Signal<WorkItem[]>;
 
-  refresh(): Promise<void>;
+  // Server-side pagination
+  readonly totalRecords: Signal<number>;
 
-  create(item: Omit<WorkItem, 'id' | 'updatedAt'>): Promise<WorkItem>;
+  refresh(query?: WorkItemsQuery): Promise<void>;
+
+  create(
+    item: Omit<WorkItem, 'id' | 'updatedAt'>,
+  ): Promise<WorkItem>;
 
   update(
     id: number,
@@ -29,15 +36,15 @@ export interface WorkItemStore {
       >
     >,
   ): Promise<void>;
-  delete(id: number): Promise<void>;
 
-  findById(id: number): WorkItem | undefined;
+  delete(id: number): Promise<void>;
 
   resetDemoData?(): void;
 
   getCounts(): WorkItemCounts;
 }
 
+// Dependency injection token
 export const WORK_ITEM_STORE = new InjectionToken<WorkItemStore>(
   'WORK_ITEM_STORE',
 );
