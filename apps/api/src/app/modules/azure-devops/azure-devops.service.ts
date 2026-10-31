@@ -1,10 +1,12 @@
 import {
   BadGatewayException,
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { UpdateWorkItemDto } from '../work-items/dto/update-work-item.dto';
 
 export interface AzureDevOpsWorkItem {
   id: number;
@@ -30,6 +32,22 @@ interface WiqlQueryResponse {
 
 interface WorkItemsResponse {
   value?: AzureDevOpsWorkItem[];
+}
+
+export type AzureDevOpsWorkItemType =
+  | 'Epic'
+  | 'Feature'
+  | 'User Story'
+  | 'Task'
+  | 'Bug';
+
+export interface CreateAzureDevOpsWorkItemInput {
+  type: AzureDevOpsWorkItemType;
+  title: string;
+  description?: string;
+  assignedTo?: string;
+  priority?: 'Low' | 'Medium' | 'High';
+  parentId?: number;
 }
 
 @Injectable()
@@ -166,6 +184,10 @@ export class AzureDevOpsService {
       );
     }
 
+    if (!responseBody.trim()) {
+      return undefined as T;
+    }
+
     try {
       return JSON.parse(responseBody) as T;
     } catch {
@@ -215,5 +237,211 @@ export class AzureDevOpsService {
     }
 
     return displayNames;
+  }
+
+  async createWorkItem(
+    input: CreateAzureDevOpsWorkItemInput,
+  ): Promise<AzureDevOpsWorkItem> {
+    const organization = this.getRequiredConfig('AZURE_DEVOPS_ORG');
+    const project = this.getRequiredConfig('AZURE_DEVOPS_PROJECT');
+    const token = this.getRequiredConfig('AZURE_DEVOPS_PAT');
+
+    const apiVersion =
+      this.config.get<string>('AZURE_DEVOPS_API_VERSION') || '7.1';
+
+    const baseUrl =
+      `https://dev.azure.com/${encodeURIComponent(organization)}` +
+      `/${encodeURIComponent(project)}`;
+
+    const headers = {
+      Authorization: `Basic ${Buffer.from(`:${token}`).toString('base64')}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json-patch+json',
+    };
+
+    const patch: Array<{
+      op: 'add';
+      path: string;
+      value: unknown;
+    }> = [
+      {
+        op: 'add',
+        path: '/fields/System.Title',
+        value: input.title.trim(),
+      },
+    ];
+
+    if (input.description) {
+      patch.push({
+        op: 'add',
+        path: '/fields/System.Description',
+        value: input.description,
+      });
+    }
+
+    if (input.assignedTo) {
+      patch.push({
+        op: 'add',
+        path: '/fields/System.AssignedTo',
+        value: input.assignedTo,
+      });
+    }
+
+    if (input.priority) {
+      const priorityMap = {
+        High: 1,
+        Medium: 3,
+        Low: 4,
+      };
+
+      patch.push({
+        op: 'add',
+        path: '/fields/Microsoft.VSTS.Common.Priority',
+        value: priorityMap[input.priority],
+      });
+    }
+
+    // Establish parent-child relationship when a parent is supplied.
+    if (input.parentId) {
+      patch.push({
+        op: 'add',
+        path: '/relations/-',
+        value: {
+          rel: 'System.LinkTypes.Hierarchy-Reverse',
+          url: `${baseUrl}/_apis/wit/workItems/${input.parentId}`,
+          attributes: {
+            comment: 'Created from Azure DevOps AI Work Item Generator',
+          },
+        },
+      });
+    }
+
+    const queryParams = new URLSearchParams({
+      'api-version': apiVersion,
+      $expand: 'relations',
+    });
+
+    const url =
+      `${baseUrl}/_apis/wit/workitems/$${encodeURIComponent(input.type)}` +
+      `?${queryParams.toString()}`;
+
+    return this.requestJson<AzureDevOpsWorkItem>(url, headers, {
+      method: 'POST',
+      body: JSON.stringify(patch),
+    });
+  }
+  async updateWorkItem(
+    id: number,
+    input: UpdateWorkItemDto,
+  ): Promise<AzureDevOpsWorkItem> {
+    const organization = this.getRequiredConfig('AZURE_DEVOPS_ORG');
+    const project = this.getRequiredConfig('AZURE_DEVOPS_PROJECT');
+    const token = this.getRequiredConfig('AZURE_DEVOPS_PAT');
+
+    const apiVersion =
+      this.config.get<string>('AZURE_DEVOPS_API_VERSION') || '7.1';
+
+    const patch: Array<{
+      op: 'add';
+      path: string;
+      value: unknown;
+    }> = [];
+
+    if (input.title !== undefined) {
+      patch.push({
+        op: 'add',
+        path: '/fields/System.Title',
+        value: input.title.trim(),
+      });
+    }
+
+    if (input.description !== undefined) {
+      patch.push({
+        op: 'add',
+        path: '/fields/System.Description',
+        value: input.description,
+      });
+    }
+
+    if (input.state !== undefined) {
+      patch.push({
+        op: 'add',
+        path: '/fields/System.State',
+        value: input.state,
+      });
+    }
+
+    if (input.assignedTo !== undefined) {
+      patch.push({
+        op: 'add',
+        path: '/fields/System.AssignedTo',
+        value: input.assignedTo,
+      });
+    }
+
+    if (input.priority !== undefined) {
+      const priorityMap = {
+        High: 1,
+        Medium: 3,
+        Low: 4,
+      };
+
+      patch.push({
+        op: 'add',
+        path: '/fields/Microsoft.VSTS.Common.Priority',
+        value: priorityMap[input.priority],
+      });
+    }
+
+    if (patch.length === 0) {
+      throw new BadRequestException('No fields provided for update.');
+    }
+
+    const baseUrl =
+      `https://dev.azure.com/${encodeURIComponent(organization)}` +
+      `/${encodeURIComponent(project)}`;
+
+    const params = new URLSearchParams({
+      'api-version': apiVersion,
+      $expand: 'relations',
+    });
+
+    const url = `${baseUrl}/_apis/wit/workitems/${id}?${params.toString()}`;
+
+    const headers = {
+      Authorization: `Basic ${Buffer.from(`:${token}`).toString('base64')}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json-patch+json',
+    };
+
+    return this.requestJson<AzureDevOpsWorkItem>(url, headers, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    });
+  }
+  async deleteWorkItem(id: number): Promise<void> {
+    const organization = this.getRequiredConfig('AZURE_DEVOPS_ORG');
+    const project = this.getRequiredConfig('AZURE_DEVOPS_PROJECT');
+    const token = this.getRequiredConfig('AZURE_DEVOPS_PAT');
+
+    const apiVersion =
+      this.config.get<string>('AZURE_DEVOPS_API_VERSION') || '7.1';
+
+    const baseUrl =
+      `https://dev.azure.com/${encodeURIComponent(organization)}` +
+      `/${encodeURIComponent(project)}`;
+
+    const params = new URLSearchParams({
+      'api-version': apiVersion,
+    });
+
+    const url = `${baseUrl}/_apis/wit/workitems/${id}?${params.toString()}`;
+
+    const headers = {
+      Authorization: `Basic ${Buffer.from(`:${token}`).toString('base64')}`,
+      Accept: 'application/json',
+    };
+
+    await this.requestJson<void>(url, headers, { method: 'DELETE' });
   }
 }

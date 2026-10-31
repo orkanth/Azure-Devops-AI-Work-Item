@@ -1,8 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   AzureDevOpsService,
   AzureDevOpsWorkItem,
 } from '../azure-devops/azure-devops.service';
+import { CreateWorkItemDto } from './dto/create-work-item.dto';
+import { UpdateWorkItemDto } from './dto/update-work-item.dto';
+import { DeleteWorkItemDto } from './dto/delete-work-item.dto';
 
 export interface WorkItemResponse {
   id: number;
@@ -114,5 +117,45 @@ export class WorkItemsService {
 
   private getString(value: unknown, fallback: string): string {
     return typeof value === 'string' && value.length > 0 ? value : fallback;
+  }
+  async create(dto: CreateWorkItemDto): Promise<WorkItemResponse> {
+    const createdItem = await this.azureDevOpsService.createWorkItem(dto);
+
+    // Map the response without making another external identity request.
+    // The next GET /work-items request will resolve display names.
+    return this.mapWorkItem(createdItem, new Map<string, string>());
+  }
+
+  async update(id: number, dto: UpdateWorkItemDto): Promise<WorkItemResponse> {
+    const updatedItem = await this.azureDevOpsService.updateWorkItem(id, dto);
+
+    // Identity lookup is supplementary; don't fail an update
+    // just because the Graph user lookup is temporarily unavailable.
+    const displayNames = await this.azureDevOpsService
+      .getUserDisplayNames()
+      .catch(() => new Map<string, string>());
+
+    return this.mapWorkItem(updatedItem, displayNames);
+  }
+
+  async assign(id: number, assignedTo: string): Promise<WorkItemResponse> {
+    return this.update(id, { assignedTo });
+  }
+
+  async delete(
+    id: number,
+    dto: DeleteWorkItemDto,
+  ): Promise<{ id: number; deleted: boolean; message: string }> {
+    if (!dto.confirm) {
+      throw new BadRequestException('Explicit confirmation is required.');
+    }
+
+    await this.azureDevOpsService.deleteWorkItem(id);
+
+    return {
+      id,
+      deleted: true,
+      message: `Work item #${id} moved to Azure DevOps Recycle Bin.`,
+    };
   }
 }
