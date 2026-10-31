@@ -438,3 +438,226 @@
     min-width: 72rem;
   }
 }
+/* Delete modal backdrop */
+.delete-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.58);
+  backdrop-filter: blur(4px);
+  animation: deleteBackdropIn 160ms ease-out;
+}
+
+/* Modal container */
+.delete-modal {
+  width: 100%;
+  max-width: 480px;
+  overflow: hidden;
+  background: var(--surface-card, #ffffff);
+  border: 1px solid var(--surface-border, #e2e8f0);
+  border-radius: 16px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.2);
+  animation: deleteModalIn 180ms ease-out;
+}
+
+/* Header */
+.delete-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 24px 0;
+}
+
+.delete-modal-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  color: #dc2626;
+  background: #fee2e2;
+  border-radius: 12px;
+  font-size: 1.25rem;
+}
+
+/* Content */
+.delete-modal-content {
+  padding: 22px 24px 24px;
+}
+
+.delete-modal-header .section-kicker {
+  margin-bottom: 8px;
+  color: #dc2626;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex: 1;
+  margin-left: 12px;
+}
+
+.delete-modal-content h2 {
+  margin: 0 0 10px;
+  color: var(--text-color, #172033);
+  font-size: 1.3rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.delete-modal-content > p {
+  margin: 0;
+  color: var(--text-color-secondary, #64748b);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+/* Selected work item */
+.delete-item-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 14px;
+  background: var(--surface-ground, #f8fafc);
+  border: 1px solid var(--surface-border, #e2e8f0);
+  border-radius: 10px;
+}
+
+.delete-item-type {
+  padding: 4px 8px;
+  color: #475569;
+  background: #e2e8f0;
+  border-radius: 5px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.delete-item-preview strong {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-color, #172033);
+  font-size: 0.88rem;
+}
+
+.delete-item-id {
+  color: var(--text-color-secondary, #64748b);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+/* Warning */
+.delete-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 12px;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 8px;
+}
+
+.delete-warning > i {
+  margin-top: 2px;
+  font-size: 1rem;
+}
+
+.delete-warning p {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+/* Confirmation checkbox */
+.delete-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 20px;
+  color: var(--text-color, #334155);
+  font-size: 0.85rem;
+  line-height: 1.5;
+  cursor: pointer;
+}
+
+.delete-confirmation input {
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  accent-color: #dc2626;
+  cursor: pointer;
+}
+
+/* Footer */
+.delete-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 18px 24px;
+  background: var(--surface-ground, #f8fafc);
+  border-top: 1px solid var(--surface-border, #e2e8f0);
+}
+
+.button-danger {
+  color: #ffffff;
+  background: #dc2626;
+  border: 1px solid #dc2626;
+}
+
+.button-danger:hover:not(:disabled) {
+  background: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.button-danger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Animations */
+@keyframes deleteBackdropIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes deleteModalIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Mobile */
+@media (max-width: 520px) {
+  .delete-modal-backdrop {
+    padding: 16px;
+  }
+
+  .delete-modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .delete-modal-actions button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .delete-item-preview {
+    flex-wrap: wrap;
+  }
+}

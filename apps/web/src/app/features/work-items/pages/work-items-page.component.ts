@@ -109,7 +109,7 @@ export class WorkItemsPageComponent implements OnInit {
       await this.workItemStore.update(result.id, result.changes);
       this.closeEdit();
       this.feedback.show(
-        'Work item updated in local demo data. Azure DevOps is not connected yet.',
+        'Work item updated.',
         'success',
       );
     } catch {
