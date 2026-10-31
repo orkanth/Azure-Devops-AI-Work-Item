@@ -15,7 +15,15 @@ export interface AzureDevOpsWorkItem {
     url: string;
   }>;
 }
+interface AzureDevOpsGraphUser {
+  displayName?: string;
+  mailAddress?: string;
+  principalName?: string;
+}
 
+interface GraphUsersResponse {
+  value?: AzureDevOpsGraphUser[];
+}
 interface WiqlQueryResponse {
   workItems?: Array<{ id: number }>;
 }
@@ -114,59 +122,98 @@ export class AzureDevOpsService {
     return value;
   }
 
- 
   private async requestJson<T>(
-  url: string,
-  headers: Record<string, string>,
-  init: RequestInit,
-): Promise<T> {
-  let response: Response;
+    url: string,
+    headers: Record<string, string>,
+    init: RequestInit,
+  ): Promise<T> {
+    let response: Response;
 
-  try {
-    response = await fetch(url, {
-      ...init,
-      headers,
-    });
-  } catch (error: unknown) {
-    this.logger.error(
-      `Could not reach Azure DevOps: ${
-        error instanceof Error ? error.message : 'Unknown network error'
-      }`,
-    );
+    try {
+      response = await fetch(url, {
+        ...init,
+        headers,
+      });
+    } catch (error: unknown) {
+      this.logger.error(
+        `Could not reach Azure DevOps: ${
+          error instanceof Error ? error.message : 'Unknown network error'
+        }`,
+      );
 
-    throw new BadGatewayException(
-      'Unable to reach Azure DevOps. Check network connectivity.',
-    );
-  }
-
-  const responseBody = await response.text();
-
-  if (!response.ok) {
-    this.logger.error(
-      `Azure DevOps returned HTTP ${response.status}: ${responseBody}`,
-    );
-
-    if (response.status === 401 || response.status === 403) {
       throw new BadGatewayException(
-        'Azure DevOps rejected the request. Check the token, its scopes, ' +
-          'and your organization/project access.',
+        'Unable to reach Azure DevOps. Check network connectivity.',
       );
     }
 
-    throw new BadGatewayException(
-      `Azure DevOps returned HTTP ${response.status}. ` +
-        'Check the NestJS terminal for details.',
-    );
+    const responseBody = await response.text();
+
+    if (!response.ok) {
+      this.logger.error(
+        `Azure DevOps returned HTTP ${response.status}: ${responseBody}`,
+      );
+
+      if (response.status === 401 || response.status === 403) {
+        throw new BadGatewayException(
+          'Azure DevOps rejected the request. Check the token, its scopes, ' +
+            'and your organization/project access.',
+        );
+      }
+
+      throw new BadGatewayException(
+        `Azure DevOps returned HTTP ${response.status}. ` +
+          'Check the NestJS terminal for details.',
+      );
+    }
+
+    try {
+      return JSON.parse(responseBody) as T;
+    } catch {
+      this.logger.error('Azure DevOps returned an invalid JSON response.');
+
+      throw new BadGatewayException(
+        'Azure DevOps returned an invalid JSON response.',
+      );
+    }
   }
 
-  try {
-    return JSON.parse(responseBody) as T;
-  } catch {
-    this.logger.error('Azure DevOps returned an invalid JSON response.');
+  async getUserDisplayNames(): Promise<Map<string, string>> {
+    const organization = this.getRequiredConfig('AZURE_DEVOPS_ORG');
+    const token = this.getRequiredConfig('AZURE_DEVOPS_PAT');
 
-    throw new BadGatewayException(
-      'Azure DevOps returned an invalid JSON response.',
+    const url = new URL(
+      `https://vssps.dev.azure.com/${encodeURIComponent(organization)}` +
+        '/_apis/graph/users',
     );
+
+    url.searchParams.set('subjectTypes', 'user');
+    url.searchParams.set('api-version', '7.1-preview.1');
+
+    const headers = {
+      Authorization: `Basic ${Buffer.from(`:${token}`).toString('base64')}`,
+      Accept: 'application/json',
+    };
+
+    const response = await this.requestJson<GraphUsersResponse>(
+      url.toString(),
+      headers,
+      { method: 'GET' },
+    );
+
+    const displayNames = new Map<string, string>();
+
+    for (const user of response.value ?? []) {
+      const name = user.displayName?.trim();
+
+      if (!name) continue;
+
+      for (const identifier of [user.mailAddress, user.principalName]) {
+        if (identifier?.trim()) {
+          displayNames.set(identifier.trim().toLowerCase(), name);
+        }
+      }
+    }
+
+    return displayNames;
   }
-}
 }

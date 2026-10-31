@@ -1,5 +1,5 @@
-import { CommonModule } from '@angular/common';
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { CommonModule } from '@angular/common'; 
+import { Component, computed, effect, inject, signal, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import type { TreeNode } from 'primeng/api';
 import { TreeTableModule } from 'primeng/treetable';
@@ -25,7 +25,7 @@ import { buildWorkItemTree } from '../utils/work-item-tree.util';
   templateUrl: './work-items-page.component.html',
   styleUrl: './work-items-page.component.css',
 })
-export class WorkItemsPageComponent {
+export class WorkItemsPageComponent implements OnInit {
   private readonly workItemStore = inject(WORK_ITEM_STORE);
   private readonly feedback = inject(AppFeedbackService);
   private readonly navigation = inject(WorkspaceNavigationService);
@@ -76,6 +76,18 @@ export class WorkItemsPageComponent {
   deleteTarget: WorkItem | null = null;
   deleteAcknowledged = false;
 
+  async ngOnInit(): Promise<void> {
+  try {
+    await this.workItemStore.refresh();
+  } catch (error) {
+    console.error('Failed to load Azure DevOps work items:', error);
+
+    this.feedback.show(
+      'Unable to load work items from Azure DevOps.',
+      'error',
+    );
+  }
+}
   startCreatePrompt(): void {
     this.navigation.navigateWithPrompt('Create a task for ');
   }

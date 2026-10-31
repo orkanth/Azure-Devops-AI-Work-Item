@@ -1,5 +1,12 @@
-export type WorkItemType = 'Epic' | 'Feature' | 'User Story' | 'Task' | 'Bug';
-export type WorkItemState = 'New' | 'Active' | 'Resolved' | 'Closed';
+export type WorkItemType =
+  | 'Epic'
+  | 'Feature'
+  | 'User Story'
+  | 'Task'
+  | 'Bug';
+
+export type WorkItemState = string;
+
 export type WorkItemPriority = 'Low' | 'Medium' | 'High';
 
 export interface WorkItem {
@@ -11,6 +18,8 @@ export interface WorkItem {
   priority: WorkItemPriority;
   parentId?: number;
   updatedAt: string;
+  assignedToEmail?: string;
+  url?: string;
 }
 
 export type WorkItemActionKind = 'create' | 'update' | 'assign' | 'delete';

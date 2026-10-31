@@ -1,11 +1,15 @@
-import { Injectable } from '@nestjs/common'; 
-import { AzureDevOpsService, AzureDevOpsWorkItem } from '../azure-devops/azure-devops.service';
+import { Injectable } from '@nestjs/common';
+import {
+  AzureDevOpsService,
+  AzureDevOpsWorkItem,
+} from '../azure-devops/azure-devops.service';
 
 export interface WorkItemResponse {
   id: number;
   title: string;
   type: string;
   state: string;
+  assignedToEmail?: string;
   assignedTo: string;
   priority: 'Low' | 'Medium' | 'High';
   updatedAt: string;
@@ -15,41 +19,72 @@ export interface WorkItemResponse {
 
 @Injectable()
 export class WorkItemsService {
-  constructor(
-    private readonly azureDevOpsService: AzureDevOpsService,
-  ) {}
+  constructor(private readonly azureDevOpsService: AzureDevOpsService) {}
 
   async findAll(): Promise<WorkItemResponse[]> {
-    const items = await this.azureDevOpsService.getWorkItems();
+    const [items, displayNames] = await Promise.all([
+      this.azureDevOpsService.getWorkItems(),
+      this.azureDevOpsService.getUserDisplayNames(),
+    ]);
 
-    return items.map((item) => this.mapWorkItem(item));
+    return items.map((item) => this.mapWorkItem(item, displayNames));
   }
 
-  private mapWorkItem(item: AzureDevOpsWorkItem): WorkItemResponse {
+  private mapWorkItem(
+    item: AzureDevOpsWorkItem,
+    displayNames: Map<string, string>,
+  ): WorkItemResponse {
     const fields = item.fields ?? {};
     const parentRelation = item.relations?.find(
-      (relation) =>
-        relation.rel === 'System.LinkTypes.Hierarchy-Reverse',
+      (relation) => relation.rel === 'System.LinkTypes.Hierarchy-Reverse',
     );
 
-    const parentMatch =
-      parentRelation?.url.match(/\/workItems\/(\d+)\/?$/i);
+    const parentMatch = parentRelation?.url.match(/\/workItems\/(\d+)\/?$/i);
 
-    const assignedTo = fields['System.AssignedTo'];
+    const assignedToValue = fields['System.AssignedTo'];
 
-    const assignee =
-      typeof assignedTo === 'string'
-        ? assignedTo
-        : assignedTo &&
-            typeof assignedTo === 'object' &&
-            'displayName' in assignedTo &&
-            typeof assignedTo.displayName === 'string'
-          ? assignedTo.displayName
-          : 'Unassigned';
+    let assignee = 'Unassigned';
+    let assigneeEmail: string | undefined;
 
-    const rawPriority = Number(
-      fields['Microsoft.VSTS.Common.Priority'],
-    );
+    if (typeof assignedToValue === 'string') {
+      const value = assignedToValue.trim();
+
+      const nameMatch = value.match(/^(.+?)\s*<([^>]+)>$/);
+
+      const matchedName = nameMatch?.[1]?.trim();
+      const matchedEmail = nameMatch?.[2]?.trim();
+
+      if (matchedName) {
+        assignee = matchedName;
+      } else {
+        assignee =
+          displayNames.get(value.toLowerCase()) || value || 'Unassigned';
+      }
+
+      if (matchedEmail) {
+        assigneeEmail = matchedEmail;
+      } else if (value.includes('@')) {
+        assigneeEmail = value;
+      }
+    } else if (assignedToValue && typeof assignedToValue === 'object') {
+      const identity = assignedToValue as Record<string, unknown>;
+
+      const displayName = identity['displayName'];
+      const mailAddress = identity['mailAddress'];
+      const uniqueName = identity['uniqueName'];
+
+      if (typeof displayName === 'string' && displayName.trim()) {
+        assignee = displayName.trim();
+      }
+
+      if (typeof mailAddress === 'string' && mailAddress.trim()) {
+        assigneeEmail = mailAddress.trim();
+      } else if (typeof uniqueName === 'string' && uniqueName.includes('@')) {
+        assigneeEmail = uniqueName.trim();
+      }
+    }
+
+    const rawPriority = Number(fields['Microsoft.VSTS.Common.Priority']);
 
     const priority: WorkItemResponse['priority'] =
       rawPriority === 1 || rawPriority === 2
@@ -58,17 +93,16 @@ export class WorkItemsService {
           ? 'Low'
           : 'Medium';
 
-    const organization =
-      process.env.AZURE_DEVOPS_ORG ?? '';
-    const project =
-      process.env.AZURE_DEVOPS_PROJECT ?? '';
+    const organization = process.env.AZURE_DEVOPS_ORG ?? '';
+    const project = process.env.AZURE_DEVOPS_PROJECT ?? '';
 
     return {
       id: item.id,
       title: this.getString(fields['System.Title'], `Item ${item.id}`),
       type: this.getString(fields['System.WorkItemType'], 'Task'),
       state: this.getString(fields['System.State'], 'New'),
-      assignedTo: assignee || 'Unassigned',
+      assignedTo: assignee,
+      ...(assigneeEmail ? { assignedToEmail: assigneeEmail } : {}),
       priority,
       updatedAt: this.getString(fields['System.ChangedDate'], ''),
       ...(parentMatch ? { parentId: Number(parentMatch[1]) } : {}),
@@ -79,8 +113,6 @@ export class WorkItemsService {
   }
 
   private getString(value: unknown, fallback: string): string {
-    return typeof value === 'string' && value.length > 0
-      ? value
-      : fallback;
+    return typeof value === 'string' && value.length > 0 ? value : fallback;
   }
 }

@@ -8,6 +8,29 @@ export interface ApiHealth {
   service: string;
 }
 
+export interface ApiWorkItem {
+  id: number;
+  title: string;
+  type: string;
+  state: string;
+  assignedTo: string;
+  priority: string;
+  updatedAt: string;
+  parentId?: number;
+  url: string;
+}
+export interface ApiWorkItem {
+  id: number;
+  title: string;
+  type: string;
+  state: string;
+  assignedTo: string;
+  assignedToEmail?: string;
+  priority: string;
+  updatedAt: string;
+  parentId?: number;
+  url: string;
+}
 @Injectable({
   providedIn: 'root',
 })
@@ -19,4 +42,9 @@ export class ApiService {
   getHealth(): Observable<ApiHealth> {
     return this.http.get<ApiHealth>(`${this.baseUrl}/health`);
   }
+getWorkItems(): Observable<ApiWorkItem[]> {
+  return this.http.get<ApiWorkItem[]>(
+    `${this.baseUrl}/work-items`,
+  );
+}
 }
