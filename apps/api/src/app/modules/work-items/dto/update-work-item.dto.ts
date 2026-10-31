@@ -18,6 +18,12 @@ export class UpdateWorkItemDto {
   @MaxLength(20000)
   description?: string;
 
+  
+  @IsOptional()
+  @IsString()
+  @MaxLength(20000)
+  acceptanceCriteria?: string;
+  
   @IsOptional()
   @IsString()
   @MinLength(1)

@@ -15,8 +15,9 @@
       <div>
         <div class="section-kicker">WORK ITEM #{{ current.id }}</div>
         <h2 [id]="'edit-title-' + current.id">Edit work item</h2>
-        <p>Update fields in the local prototype.</p>
+        <p>Changes will be saved to Azure DevOps.</p>
       </div>
+
       <button
         type="button"
         class="icon-button"
@@ -28,6 +29,12 @@
     </div>
 
     <form (ngSubmit)="submit()">
+
+      <div class="field-label">
+        Work item type
+        <div class="readonly-field">{{ current.type }}</div>
+      </div>
+
       <label class="field-label">
         Title
         <input
@@ -35,49 +42,77 @@
           name="editTitle"
           [(ngModel)]="editTitle"
           required
-          maxlength="180"
+          maxlength="255"
         />
+      </label>
+
+      <label class="field-label">
+        Description
+        <textarea
+          name="editDescription"
+          [(ngModel)]="editDescription"
+          rows="4"
+          maxlength="20000"
+        ></textarea>
+      </label>
+
+      <label
+        class="field-label"
+        *ngIf="current.type === 'User Story' || current.type === 'Bug'"
+      >
+        Acceptance Criteria
+        <textarea
+          name="editAcceptanceCriteria"
+          [(ngModel)]="editAcceptanceCriteria"
+          rows="5"
+          placeholder="Given..., When..., Then..."
+          maxlength="20000"
+        ></textarea>
       </label>
 
       <div class="form-grid">
         <label class="field-label">
-          Work item type
-          <select name="editType" [(ngModel)]="editType">
-            <option *ngFor="let type of workItemTypes" [ngValue]="type">{{ type }}</option>
-          </select>
-        </label>
-
-        <label class="field-label">
           State
           <select name="editState" [(ngModel)]="editState">
-            <option *ngFor="let state of workItemStates" [ngValue]="state">{{ state }}</option>
+            <option *ngFor="let state of availableStates" [ngValue]="state">
+              {{ state }}
+            </option>
           </select>
         </label>
 
         <label class="field-label">
-          Assigned to
+          Assigned to (email)
           <input
-            type="text"
+            type="email"
             name="editAssignee"
             [(ngModel)]="editAssignee"
-            placeholder="Person name or Unassigned"
+            placeholder="user@company.com"
           />
         </label>
 
         <label class="field-label">
           Priority
           <select name="editPriority" [(ngModel)]="editPriority">
-            <option *ngFor="let priority of priorities" [ngValue]="priority">{{ priority }}</option>
+            <option *ngFor="let priority of priorities" [ngValue]="priority">
+              {{ priority }}
+            </option>
           </select>
         </label>
       </div>
 
-      <p class="form-error" *ngIf="modalError" role="alert">{{ modalError }}</p>
+      <p class="form-error" *ngIf="modalError" role="alert">
+        {{ modalError }}
+      </p>
 
       <div class="modal-actions">
-        <button type="button" class="button button-quiet" (click)="closed.emit()">
+        <button
+          type="button"
+          class="button button-quiet"
+          (click)="closed.emit()"
+        >
           Cancel
         </button>
+
         <button type="submit" class="button button-primary">
           <i class="pi pi-check"></i> Save changes
         </button>

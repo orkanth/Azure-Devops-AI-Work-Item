@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+
 import {
   WorkItem,
   WorkItemPriority,
@@ -10,7 +11,17 @@ import {
 
 export interface WorkItemEditResult {
   id: number;
-  changes: Partial<Pick<WorkItem, 'title' | 'type' | 'state' | 'assignedTo' | 'priority'>>;
+  changes: Partial<
+    Pick<
+      WorkItem,
+      | 'title'
+      | 'description'
+      | 'acceptanceCriteria'
+      | 'state'
+      | 'assignedTo'
+      | 'priority'
+    >
+  >;
 }
 
 @Component({
@@ -29,9 +40,12 @@ export class WorkItemEditDialogComponent {
 
     if (value) {
       this.editTitle = value.title;
-      this.editType = value.type;
+      this.editDescription = value.description ?? '';
+      this.editAcceptanceCriteria = value.acceptanceCriteria ?? '';
       this.editState = value.state;
-      this.editAssignee = value.assignedTo;
+      this.editAssignee =
+        value.assignedToEmail ??
+        (value.assignedTo === 'Unassigned' ? '' : value.assignedTo);
       this.editPriority = value.priority;
       this.modalError = '';
     }
@@ -41,7 +55,9 @@ export class WorkItemEditDialogComponent {
     return this.currentItem;
   }
 
+  // Retained for compatibility with the existing parent binding.
   @Input() workItemTypes: WorkItemType[] = [];
+
   @Input() workItemStates: WorkItemState[] = [];
   @Input() priorities: WorkItemPriority[] = [];
 
@@ -49,38 +65,53 @@ export class WorkItemEditDialogComponent {
   @Output() saved = new EventEmitter<WorkItemEditResult>();
 
   editTitle = '';
-  editType: WorkItemType = 'Task';
+  editDescription = '';
+  editAcceptanceCriteria = '';
   editState: WorkItemState = 'New';
   editAssignee = '';
   editPriority: WorkItemPriority = 'Medium';
   modalError = '';
 
+  get availableStates(): WorkItemState[] {
+    const currentState = this.currentItem?.state;
+
+    return currentState && !this.workItemStates.includes(currentState)
+      ? [...this.workItemStates, currentState]
+      : this.workItemStates;
+  }
+
   submit(): void {
     const item = this.currentItem;
+
     if (!item) return;
 
     const title = this.editTitle.trim();
-    const assignedTo = this.editAssignee.trim();
 
     if (!title) {
       this.modalError = 'A title is required.';
       return;
     }
 
-    if (!assignedTo) {
-      this.modalError = 'Enter a person name or use Unassigned.';
-      return;
+    const changes: WorkItemEditResult['changes'] = {
+      title,
+      description: this.editDescription.trim(),
+      state: this.editState,
+      priority: this.editPriority,
+    };
+
+    if (item.type === 'User Story' || item.type === 'Bug') {
+      changes.acceptanceCriteria = this.editAcceptanceCriteria.trim();
+    }
+
+    const assignee = this.editAssignee.trim();
+
+    if (assignee) {
+      changes.assignedTo = assignee;
     }
 
     this.saved.emit({
       id: item.id,
-      changes: {
-        title,
-        type: this.editType,
-        state: this.editState,
-        assignedTo,
-        priority: this.editPriority,
-      },
+      changes,
     });
   }
 }

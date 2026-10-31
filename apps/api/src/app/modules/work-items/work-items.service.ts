@@ -14,6 +14,8 @@ export interface WorkItemResponse {
   state: string;
   assignedToEmail?: string;
   assignedTo: string;
+  acceptanceCriteria?: string;
+  description?: string;
   priority: 'Low' | 'Medium' | 'High';
   updatedAt: string;
   parentId?: number;
@@ -106,9 +108,15 @@ export class WorkItemsService {
       state: this.getString(fields['System.State'], 'New'),
       assignedTo: assignee,
       ...(assigneeEmail ? { assignedToEmail: assigneeEmail } : {}),
+      description: this.getString(fields['System.Description'], ''),
+      acceptanceCriteria: this.getString(
+        fields['Microsoft.VSTS.Common.AcceptanceCriteria'],
+        '',
+      ),
       priority,
       updatedAt: this.getString(fields['System.ChangedDate'], ''),
       ...(parentMatch ? { parentId: Number(parentMatch[1]) } : {}),
+
       url:
         `https://dev.azure.com/${encodeURIComponent(organization)}` +
         `/${encodeURIComponent(project)}/_workitems/edit/${item.id}`,

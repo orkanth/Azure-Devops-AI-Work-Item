@@ -13,12 +13,14 @@ export interface WorkItem {
   id: number;
   type: WorkItemType;
   title: string;
+  description?: string;
+  acceptanceCriteria?: string;
   state: WorkItemState;
   assignedTo: string;
+  assignedToEmail?: string;
   priority: WorkItemPriority;
   parentId?: number;
   updatedAt: string;
-  assignedToEmail?: string;
   url?: string;
 }
 

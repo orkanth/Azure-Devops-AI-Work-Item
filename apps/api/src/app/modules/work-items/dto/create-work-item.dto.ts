@@ -24,6 +24,11 @@ export class CreateWorkItemDto {
 
   @IsOptional()
   @IsString()
+  @MaxLength(20000)
+  acceptanceCriteria?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(256)
   assignedTo?: string;
 

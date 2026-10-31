@@ -4,7 +4,10 @@ import { firstValueFrom } from 'rxjs';
 import {
   ApiService,
   ApiWorkItem,
+  CreateApiWorkItemRequest,
+  UpdateApiWorkItemRequest,
 } from '../../../core/services/api.service';
+
 import {
   WorkItem,
   WorkItemPriority,
@@ -15,7 +18,6 @@ import type {
   WorkItemStore,
   WorkItemCounts,
 } from './work-item-store';
- 
 
 @Injectable()
 export class AzureDevOpsWorkItemStore implements WorkItemStore {
@@ -35,11 +37,106 @@ export class AzureDevOpsWorkItemStore implements WorkItemStore {
     );
   }
 
+  async create(
+    item: Omit<WorkItem, 'id' | 'updatedAt'>,
+  ): Promise<WorkItem> {
+    const payload: CreateApiWorkItemRequest = {
+      type: item.type,
+      title: item.title,
+      description: item.description,
+      acceptanceCriteria: item.acceptanceCriteria,
+      assignedTo:
+        item.assignedToEmail ||
+        (item.assignedTo !== 'Unassigned' ? item.assignedTo : undefined),
+      priority: item.priority,
+      parentId: item.parentId,
+    };
+
+    const response = await firstValueFrom(
+      this.apiService.createWorkItem(payload),
+    );
+
+    const created = this.mapWorkItem(response);
+
+    this._items.update((current) => [
+      created,
+      ...current.filter((existing) => existing.id !== created.id),
+    ]);
+
+    return created;
+  }
+
+  async update(
+    id: number,
+    changes: Partial<
+      Pick<
+        WorkItem,
+        | 'title'
+        | 'description'
+        | 'acceptanceCriteria'
+        | 'state'
+        | 'assignedTo'
+        | 'priority'
+      >
+    >,
+  ): Promise<void> {
+    const payload: UpdateApiWorkItemRequest = {
+      ...(changes.title !== undefined && { title: changes.title }),
+      ...(changes.description !== undefined && {
+        description: changes.description,
+      }),
+      ...(changes.acceptanceCriteria !== undefined && {
+        acceptanceCriteria: changes.acceptanceCriteria,
+      }),
+      ...(changes.state !== undefined && { state: changes.state }),
+      ...(changes.assignedTo !== undefined && {
+        assignedTo: changes.assignedTo,
+      }),
+      ...(changes.priority !== undefined && {
+        priority: changes.priority,
+      }),
+    };
+
+    const response = await firstValueFrom(
+      this.apiService.updateWorkItem(id, payload),
+    );
+
+    const updated = this.mapWorkItem(response);
+    const existing = this.findById(id);
+
+    this._items.update((current) =>
+      current.map((item) =>
+        item.id === id
+          ? {
+              ...updated,
+              parentId: updated.parentId ?? existing?.parentId,
+            }
+          : item,
+      ),
+    );
+  }
+
+  async delete(id: number): Promise<void> {
+    await firstValueFrom(
+      this.apiService.deleteWorkItem(id),
+    );
+
+    // Remove locally only after Azure DevOps confirms deletion.
+    this._items.update((current) =>
+      current.filter((item) => item.id !== id),
+    );
+
+    // Refresh because deleting a parent can affect child relationships.
+    await this.refresh();
+  }
+
   private mapWorkItem(item: ApiWorkItem): WorkItem {
     return {
       id: item.id,
       title: item.title,
-      type: item.type as WorkItemType,
+      type: this.mapType(item.type),
+      description: item.description,
+      acceptanceCriteria: item.acceptanceCriteria,
       state: item.state,
       assignedTo: item.assignedTo || 'Unassigned',
       assignedToEmail: item.assignedToEmail,
@@ -48,6 +145,22 @@ export class AzureDevOpsWorkItemStore implements WorkItemStore {
       updatedAt: item.updatedAt,
       url: item.url,
     };
+  }
+
+  private mapType(type: string): WorkItemType {
+    const supportedTypes: WorkItemType[] = [
+      'Epic',
+      'Feature',
+      'User Story',
+      'Task',
+      'Bug',
+    ];
+
+    if (!supportedTypes.includes(type as WorkItemType)) {
+      throw new Error(`Unsupported Azure DevOps work item type: ${type}`);
+    }
+
+    return type as WorkItemType;
   }
 
   private mapPriority(priority: string): WorkItemPriority {
@@ -80,27 +193,5 @@ export class AzureDevOpsWorkItemStore implements WorkItemStore {
         ['resolved', 'closed', 'done'].includes(item.state.toLowerCase()),
       ).length,
     };
-  }
-
-  async create(
-    _item: Omit<WorkItem, 'id' | 'updatedAt'>,
-  ): Promise<WorkItem> {
-    throw new Error('Azure DevOps create endpoint is not implemented yet.');
-  }
-
-  async update(
-    _id: number,
-    _changes: Partial<
-      Pick<
-        WorkItem,
-        'title' | 'type' | 'state' | 'assignedTo' | 'priority' | 'parentId'
-      >
-    >,
-  ): Promise<void> {
-    throw new Error('Azure DevOps update endpoint is not implemented yet.');
-  }
-
-  async delete(_id: number): Promise<void> {
-    throw new Error('Azure DevOps delete endpoint is not implemented yet.');
   }
 }

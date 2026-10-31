@@ -175,3 +175,22 @@
     grid-template-columns: 1fr;
   }
 }
+
+.field-label textarea,
+.readonly-field {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--surface-border, #d9dee8);
+  border-radius: 7px;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.field-label textarea {
+  resize: vertical;
+  min-height: 90px;
+}
+
+.readonly-field {
+  background: var(--surface-ground, #f5f6f8);
+}

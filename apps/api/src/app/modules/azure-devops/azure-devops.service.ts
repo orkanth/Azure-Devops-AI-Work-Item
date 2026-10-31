@@ -45,6 +45,7 @@ export interface CreateAzureDevOpsWorkItemInput {
   type: AzureDevOpsWorkItemType;
   title: string;
   description?: string;
+  acceptanceCriteria?: string;
   assignedTo?: string;
   priority?: 'Low' | 'Medium' | 'High';
   parentId?: number;
@@ -270,7 +271,16 @@ export class AzureDevOpsService {
         value: input.title.trim(),
       },
     ];
-
+    if (
+      input.acceptanceCriteria?.trim() &&
+      ['User Story', 'Bug'].includes(input.type)
+    ) {
+      patch.push({
+        op: 'add',
+        path: '/fields/Microsoft.VSTS.Common.AcceptanceCriteria',
+        value: input.acceptanceCriteria,
+      });
+    }
     if (input.description) {
       patch.push({
         op: 'add',
@@ -355,6 +365,14 @@ export class AzureDevOpsService {
       });
     }
 
+    if (input.acceptanceCriteria !== undefined) {
+      patch.push({
+        op: 'add',
+        path: '/fields/Microsoft.VSTS.Common.AcceptanceCriteria',
+        value: input.acceptanceCriteria,
+      });
+    }
+
     if (input.description !== undefined) {
       patch.push({
         op: 'add',
@@ -419,6 +437,7 @@ export class AzureDevOpsService {
       body: JSON.stringify(patch),
     });
   }
+
   async deleteWorkItem(id: number): Promise<void> {
     const organization = this.getRequiredConfig('AZURE_DEVOPS_ORG');
     const project = this.getRequiredConfig('AZURE_DEVOPS_PROJECT');

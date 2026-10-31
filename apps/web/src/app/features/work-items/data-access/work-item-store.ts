@@ -13,9 +13,7 @@ export interface WorkItemStore {
 
   refresh(): Promise<void>;
 
-  create(
-    item: Omit<WorkItem, 'id' | 'updatedAt'>,
-  ): Promise<WorkItem>;
+  create(item: Omit<WorkItem, 'id' | 'updatedAt'>): Promise<WorkItem>;
 
   update(
     id: number,
@@ -23,15 +21,14 @@ export interface WorkItemStore {
       Pick<
         WorkItem,
         | 'title'
-        | 'type'
+        | 'description'
+        | 'acceptanceCriteria'
         | 'state'
         | 'assignedTo'
         | 'priority'
-        | 'parentId'
       >
     >,
   ): Promise<void>;
-
   delete(id: number): Promise<void>;
 
   findById(id: number): WorkItem | undefined;
@@ -41,5 +38,6 @@ export interface WorkItemStore {
   getCounts(): WorkItemCounts;
 }
 
-export const WORK_ITEM_STORE =
-  new InjectionToken<WorkItemStore>('WORK_ITEM_STORE');
+export const WORK_ITEM_STORE = new InjectionToken<WorkItemStore>(
+  'WORK_ITEM_STORE',
+);
