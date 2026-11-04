@@ -14,6 +14,7 @@ import { UpdateWorkItemDto } from './dto/update-work-item.dto';
 import { AssignWorkItemDto } from './dto/assign-work-item.dto';
 import { DeleteWorkItemDto } from './dto/delete-work-item.dto';
 import { WorkItemsService } from './work-items.service';
+import { PublishEpicDto } from './dto/publish-work-items.dto';
 
 @Controller('work-items')
 export class WorkItemsController {
@@ -50,5 +51,9 @@ export class WorkItemsController {
     @Body() dto: DeleteWorkItemDto,
   ) {
     return this.workItemsService.delete(id, dto);
+  }
+  @Post('publish')
+  publish(@Body() dto: PublishEpicDto) {
+    return this.workItemsService.publish(dto);
   }
 }

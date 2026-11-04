@@ -6,7 +6,8 @@ import {
 import { CreateWorkItemDto } from './dto/create-work-item.dto';
 import { UpdateWorkItemDto } from './dto/update-work-item.dto';
 import { DeleteWorkItemDto } from './dto/delete-work-item.dto';
-
+import { PublishEpicDto } from './dto/publish-work-items.dto';
+import { CreateAzureDevOpsWorkItemInput } from '../azure-devops/azure-devops.service';
 export interface WorkItemResponse {
   id: number;
   title: string;
@@ -164,6 +165,143 @@ export class WorkItemsService {
       id,
       deleted: true,
       message: `Work item #${id} moved to Azure DevOps Recycle Bin.`,
+    };
+  }
+
+  async publish(dto: PublishEpicDto) {
+    const publishTag = `DevFlowPublish-${dto.publishId}`;
+
+    // Check whether this proposal has already created an Epic.
+    const existingEpicIds = await this.azureDevOpsService.findWorkItemIdsByTag(
+      publishTag,
+      'Epic',
+    );
+
+    if (existingEpicIds.length > 0) {
+      return {
+        success: false,
+        status: 'already-published',
+        message:
+          'This proposal has already created an Epic. ' +
+          'No new work items were created.',
+        existingEpicId: existingEpicIds[0],
+        created: [],
+        errors: [],
+      };
+    }
+    const created: Array<{
+      id: number;
+      type: string;
+      title: string;
+      parentId?: number;
+      url: string;
+    }> = [];
+
+    const errors: Array<{
+      type: string;
+      title: string;
+      message: string;
+    }> = [];
+
+    const createItem = async (
+      input: CreateAzureDevOpsWorkItemInput,
+    ): Promise<number | null> => {
+      try {
+        const item = await this.azureDevOpsService.createWorkItem(input);
+
+        created.push({
+          id: item.id,
+          type: input.type,
+          title: input.title,
+          ...(input.parentId ? { parentId: input.parentId } : {}),
+          url: item.url,
+        });
+
+        return item.id;
+      } catch (error: unknown) {
+        errors.push({
+          type: input.type,
+          title: input.title,
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Unknown Azure DevOps error',
+        });
+
+        return null;
+      }
+    };
+
+    // 1. Create the Epic.
+    const epicId = await createItem({
+      type: 'Epic',
+      title: dto.title,
+      description: dto.description,
+      tags: publishTag,
+    });
+
+    // Without an Epic, the hierarchy cannot be created.
+    if (epicId === null) {
+      return {
+        success: false,
+        status: 'failed',
+        message: 'The Epic could not be created.',
+        created,
+        errors,
+      };
+    }
+
+    // 2. Create Features under the Epic.
+    for (const feature of dto.features) {
+      const featureId = await createItem({
+        type: 'Feature',
+        title: feature.title,
+        description: feature.description,
+        parentId: epicId,
+      });
+
+      // Skip this Feature's descendants if its creation failed.
+      if (featureId === null) {
+        continue;
+      }
+
+      // 3. Create User Stories under each Feature.
+      for (const story of feature.user_stories) {
+        const storyId = await createItem({
+          type: 'User Story',
+          title: story.title,
+          description: story.description,
+          acceptanceCriteria: story.acceptance_criteria.join('\n'),
+          parentId: featureId,
+        });
+
+        // Skip this Story's Tasks if its creation failed.
+        if (storyId === null) {
+          continue;
+        }
+
+        // 4. Create Tasks under each User Story.
+        for (const task of story.tasks) {
+          await createItem({
+            type: 'Task',
+            title: task.title,
+            description: task.description,
+            parentId: storyId,
+          });
+        }
+      }
+    }
+
+    const success = errors.length === 0;
+
+    return {
+      success,
+      status: success ? 'completed' : created.length > 0 ? 'partial' : 'failed',
+      message: success
+        ? 'All work items were published successfully.'
+        : 'Publishing finished with errors. Review the results before retrying.',
+      created,
+      errors,
     };
   }
 }

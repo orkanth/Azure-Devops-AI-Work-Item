@@ -15,9 +15,10 @@
   <button
     type="button"
     class="button button-primary"
-    (click)="startCreatePrompt()"
+    (click)="openAiProposalDialog()"
   >
-    <i class="pi pi-plus" aria-hidden="true"></i> Create with AI
+    <i class="pi pi-plus" aria-hidden="true"></i>
+    Create with AI
   </button>
 </section>
 
@@ -386,3 +387,303 @@
   (closed)="closeEdit()"
   (saved)="saveEdit($event)"
 ></app-work-item-edit-dialog>
+
+<!-- AI Work Item Proposal Dialog -->
+<div
+  *ngIf="showAiProposalDialog()"
+  class="delete-modal-backdrop"
+  (click)="closeAiProposalDialog()"
+  role="presentation"
+>
+  <section
+    class="delete-modal ai-proposal-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="ai-proposal-title"
+    (click)="$event.stopPropagation()"
+  >
+    <div class="delete-modal-header">
+      <div>
+        <div class="section-kicker">DEVFLOW AI</div>
+        <h2 id="ai-proposal-title">Generate work-item proposal</h2>
+      </div>
+
+      <button
+        type="button"
+        class="icon-button"
+        aria-label="Close dialog"
+        [disabled]="isGeneratingProposal()"
+        (click)="closeAiProposalDialog()"
+      >
+        <i class="pi pi-times" aria-hidden="true"></i>
+      </button>
+    </div>
+
+    <div class="delete-modal-content">
+      <label for="ai-requirement"> Describe what you want to build </label>
+      <div class="mt-4">
+        <textarea
+          id="ai-requirement"
+          rows="5"
+          style="width: 100%"
+          [ngModel]="aiRequirement()"
+          (ngModelChange)="aiRequirement.set($event)"
+          placeholder="Example: Build a user management module with registration, login, role-based access, and password reset."
+        ></textarea>
+        <p *ngIf="aiProposalError()" role="alert" class="error-message">
+          {{ aiProposalError() }}
+        </p>
+      </div>
+      <button
+        type="button"
+        class="button button-primary"
+        [disabled]="isGeneratingProposal()"
+        (click)="generateAiProposal()"
+      >
+        <i
+          class="pi"
+          [ngClass]="
+            isGeneratingProposal() ? 'pi-spinner pi-spin' : 'pi-sparkles'
+          "
+        ></i>
+        {{ isGeneratingProposal() ? 'Generating...' : 'Generate proposal' }}
+      </button>
+
+      <section *ngIf="aiProposal() as epic" class="ai-proposal-result mt-4">
+        <div class="ai-proposal-editor">
+          <h3>Review AI-generated proposal</h3>
+
+          <div class="ai-proposal-field">
+            <label for="ai-epic-title">Epic title</label>
+            <input
+              id="ai-epic-title"
+              type="text"
+              [ngModel]="epic.title"
+              (ngModelChange)="updateEpicField('title', $event)"
+              placeholder="Enter Epic title"
+            />
+          </div>
+
+          <div class="ai-proposal-field">
+            <label for="ai-epic-description">Epic description</label>
+            <textarea
+              id="ai-epic-description"
+              rows="4"
+              [ngModel]="epic.description"
+              (ngModelChange)="updateEpicField('description', $event)"
+              placeholder="Describe the Epic"
+            ></textarea>
+          </div>
+        </div>
+
+        <div
+          *ngFor="let feature of epic.features; let featureIndex = index;  trackBy: trackByIndex" 
+          class="ai-proposal-feature"
+        >
+          <h4>Review Feature {{ featureIndex + 1 }}</h4>
+
+          <div class="ai-proposal-field">
+            <label [for]="'feature-title-' + featureIndex">
+              Feature title
+            </label>
+            <input
+              [id]="'feature-title-' + featureIndex"
+              type="text"
+              [ngModel]="feature.title"
+              (ngModelChange)="
+                updateFeatureField(featureIndex, 'title', $event)
+              "
+            />
+          </div>
+
+          <div class="ai-proposal-field">
+            <label [for]="'feature-description-' + featureIndex">
+              Feature description
+            </label>
+            <textarea
+              [id]="'feature-description-' + featureIndex"
+              rows="3"
+              [ngModel]="feature.description"
+              (ngModelChange)="
+                updateFeatureField(featureIndex, 'description', $event)
+              "
+            ></textarea>
+          </div>
+
+          <div
+            *ngFor="let story of feature.user_stories; let storyIndex = index; trackBy: trackByIndex"
+            class="ai-proposal-story"
+          >
+            <h5>Review User Story {{ storyIndex + 1 }}</h5>
+
+            <div class="ai-proposal-field">
+              <label [for]="'story-title-' + featureIndex + '-' + storyIndex">
+                User Story title
+              </label>
+              <input
+                [id]="'story-title-' + featureIndex + '-' + storyIndex"
+                type="text"
+                [ngModel]="story.title"
+                (ngModelChange)="
+                  updateStoryField(featureIndex, storyIndex, 'title', $event)
+                "
+              />
+            </div>
+
+            <div class="ai-proposal-field">
+              <label
+                [for]="'story-description-' + featureIndex + '-' + storyIndex"
+              >
+                User Story description
+              </label>
+              <textarea
+                [id]="'story-description-' + featureIndex + '-' + storyIndex"
+                rows="3"
+                [ngModel]="story.description"
+                (ngModelChange)="
+                  updateStoryField(
+                    featureIndex,
+                    storyIndex,
+                    'description',
+                    $event
+                  )
+                "
+              ></textarea>
+            </div>
+
+            <div class="ai-proposal-field">
+              <label
+                [for]="'story-criteria-' + featureIndex + '-' + storyIndex"
+              >
+                Acceptance criteria (one per line)
+              </label>
+              <textarea
+                [id]="'story-criteria-' + featureIndex + '-' + storyIndex"
+                rows="4"
+                [ngModel]="story.acceptance_criteria.join('\n')"
+                (ngModelChange)="
+                  updateStoryCriteria(featureIndex, storyIndex, $event)
+                "
+              ></textarea>
+            </div>
+            <div class="ai-proposal-tasks">
+              <h6>Review Tasks</h6>
+
+              <div
+                *ngFor="let task of story.tasks; let taskIndex = index;   trackBy: trackByIndex"
+                class="ai-proposal-task"
+              >
+                <div class="ai-proposal-field">
+                  <label
+                    [for]="
+                      'task-title-' +
+                      featureIndex +
+                      '-' +
+                      storyIndex +
+                      '-' +
+                      taskIndex
+                    "
+                  >
+                    Task title
+                  </label>
+                  <input
+                    [id]="
+                      'task-title-' +
+                      featureIndex +
+                      '-' +
+                      storyIndex +
+                      '-' +
+                      taskIndex
+                    "
+                    type="text"
+                    [ngModel]="task.title"
+                    (ngModelChange)="
+                      updateTaskField(
+                        featureIndex,
+                        storyIndex,
+                        taskIndex,
+                        'title',
+                        $event
+                      )
+                    "
+                  />
+                </div>
+
+                <div class="ai-proposal-field">
+                  <label
+                    [for]="
+                      'task-description-' +
+                      featureIndex +
+                      '-' +
+                      storyIndex +
+                      '-' +
+                      taskIndex
+                    "
+                  >
+                    Task description
+                  </label>
+                  <textarea
+                    [id]="
+                      'task-description-' +
+                      featureIndex +
+                      '-' +
+                      storyIndex +
+                      '-' +
+                      taskIndex
+                    "
+                    rows="3"
+                    [ngModel]="task.description"
+                    (ngModelChange)="
+                      updateTaskField(
+                        featureIndex,
+                        storyIndex,
+                        taskIndex,
+                        'description',
+                        $event
+                      )
+                    "
+                  ></textarea>
+                </div>
+
+                <div class="ai-proposal-field">
+                  <label
+                    [for]="
+                      'task-criteria-' +
+                      featureIndex +
+                      '-' +
+                      storyIndex +
+                      '-' +
+                      taskIndex
+                    "
+                  >
+                    Acceptance criteria (one per line)
+                  </label>
+                  <textarea
+                    [id]="
+                      'task-criteria-' +
+                      featureIndex +
+                      '-' +
+                      storyIndex +
+                      '-' +
+                      taskIndex
+                    "
+                    rows="3"
+                    [ngModel]="task.acceptance_criteria.join('\n')"
+                    (ngModelChange)="
+                      updateTaskCriteria(
+                        featureIndex,
+                        storyIndex,
+                        taskIndex,
+                        $event
+                      )
+                    "
+                  ></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </section>
+</div>

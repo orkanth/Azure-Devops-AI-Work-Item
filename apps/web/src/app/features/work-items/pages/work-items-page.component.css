@@ -709,3 +709,61 @@
   font-weight: 600;
   cursor: pointer;
 }
+.delete-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.ai-proposal-modal {
+  width: min(900px, 100%);
+  max-width:   min(900px, 100%);
+  max-height: calc(100vh - 48px);
+
+  display: flex;
+  flex-direction: column;
+
+  overflow: hidden;
+}
+
+.ai-proposal-modal .delete-modal-header {
+  flex-shrink: 0;
+}
+
+.ai-proposal-modal .delete-modal-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.ai-proposal-editor {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.ai-proposal-field {
+  display: grid;
+  gap: 8px;
+}
+
+.ai-proposal-field input,
+.ai-proposal-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  font: inherit;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 8px;
+}
+
+.ai-proposal-field textarea {
+  resize: vertical;
+}

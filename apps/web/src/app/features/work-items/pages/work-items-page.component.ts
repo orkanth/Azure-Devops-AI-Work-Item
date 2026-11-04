@@ -28,7 +28,9 @@ import { buildWorkItemTree } from '../utils/work-item-tree.util';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { WorkItemsQuery } from '../../../shared/models/work-items-query.model';
-
+import { PaginatorModule } from 'primeng/paginator';
+import { AiWorkItemProposalService } from '../data-access/ai-work-item-proposal.service';
+import type { AiEpicProposal } from '../models/ai-work-item-proposal.model';
 @Component({
   selector: 'app-work-items-page',
   standalone: true,
@@ -62,6 +64,14 @@ export class WorkItemsPageComponent implements OnInit {
 
   private readonly searchChanges$ = new Subject<string>();
   private readonly destroyRef = inject(DestroyRef);
+
+  private readonly aiProposalService = inject(AiWorkItemProposalService);
+
+  readonly showAiProposalDialog = signal(false);
+  readonly aiRequirement = signal('');
+  readonly isGeneratingProposal = signal(false);
+  readonly aiProposal = signal<AiEpicProposal | null>(null);
+  readonly aiProposalError = signal('');
 
   constructor() {
     this.searchChanges$
@@ -327,6 +337,227 @@ export class WorkItemsPageComponent implements OnInit {
     this.first.set(0);
 
     void this.loadWorkItems();
+  }
+
+  openAiProposalDialog(): void {
+    this.aiRequirement.set('');
+    this.aiProposal.set(null);
+    this.aiProposalError.set('');
+    this.showAiProposalDialog.set(true);
+  }
+
+  closeAiProposalDialog(): void {
+    if (this.isGeneratingProposal()) return;
+
+    this.showAiProposalDialog.set(false);
+  }
+
+  async generateAiProposal(): Promise<void> {
+    const requirement = this.aiRequirement().trim();
+
+    if (requirement.length < 10) {
+      this.aiProposalError.set(
+        'Please enter a requirement with at least 10 characters.',
+      );
+      return;
+    }
+
+    this.isGeneratingProposal.set(true);
+    this.aiProposalError.set('');
+    this.aiProposal.set(null);
+
+    try {
+      const response = await this.aiProposalService.generateProposal({
+        requirement,
+      });
+
+      if (!response.epic) {
+        throw new Error('The AI returned no Epic proposal.');
+      }
+
+      this.aiProposal.set(response.epic);
+    } catch (error) {
+      console.error('Failed to generate AI proposal:', error);
+
+      this.aiProposalError.set(
+        'Unable to generate the proposal. Please check the AI service and try again.',
+      );
+    } finally {
+      this.isGeneratingProposal.set(false);
+    }
+  }
+
+  updateEpicField(field: 'title' | 'description', value: string): void {
+    this.aiProposal.update((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        [field]: value,
+      };
+    });
+  }
+
+  updateFeatureField(
+    featureIndex: number,
+    field: 'title' | 'description',
+    value: string,
+  ): void {
+    this.aiProposal.update((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        features: current.features.map((feature, index) =>
+          index === featureIndex ? { ...feature, [field]: value } : feature,
+        ),
+      };
+    });
+  }
+  updateStoryField(
+    featureIndex: number,
+    storyIndex: number,
+    field: 'title' | 'description',
+    value: string,
+  ): void {
+    this.aiProposal.update((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        features: current.features.map((feature, fIndex) =>
+          fIndex === featureIndex
+            ? {
+                ...feature,
+                user_stories: feature.user_stories.map((story, sIndex) =>
+                  sIndex === storyIndex ? { ...story, [field]: value } : story,
+                ),
+              }
+            : feature,
+        ),
+      };
+    });
+  }
+
+  updateStoryCriteria(
+    featureIndex: number,
+    storyIndex: number,
+    value: string,
+  ): void {
+    this.aiProposal.update((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        features: current.features.map((feature, fIndex) =>
+          fIndex === featureIndex
+            ? {
+                ...feature,
+                user_stories: feature.user_stories.map((story, sIndex) =>
+                  sIndex === storyIndex
+                    ? {
+                        ...story,
+                        acceptance_criteria: value
+                          .split('\n')
+                          .map((item) => item.trim())
+                          .filter(Boolean),
+                      }
+                    : story,
+                ),
+              }
+            : feature,
+        ),
+      };
+    });
+  }
+  updateTaskField(
+    featureIndex: number,
+    storyIndex: number,
+    taskIndex: number,
+    field: 'title' | 'description',
+    value: string,
+  ): void {
+    this.aiProposal.update((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        features: current.features.map((feature, fIndex) =>
+          fIndex === featureIndex
+            ? {
+                ...feature,
+                user_stories: feature.user_stories.map((story, sIndex) =>
+                  sIndex === storyIndex
+                    ? {
+                        ...story,
+                        tasks: story.tasks.map((task, tIndex) =>
+                          tIndex === taskIndex
+                            ? { ...task, [field]: value }
+                            : task,
+                        ),
+                      }
+                    : story,
+                ),
+              }
+            : feature,
+        ),
+      };
+    });
+  }
+
+  updateTaskCriteria(
+    featureIndex: number,
+    storyIndex: number,
+    taskIndex: number,
+    value: string,
+  ): void {
+    this.aiProposal.update((current) => {
+      if (!current) {
+        return current;
+      }
+
+      return {
+        ...current,
+        features: current.features.map((feature, fIndex) =>
+          fIndex === featureIndex
+            ? {
+                ...feature,
+                user_stories: feature.user_stories.map((story, sIndex) =>
+                  sIndex === storyIndex
+                    ? {
+                        ...story,
+                        tasks: story.tasks.map((task, tIndex) =>
+                          tIndex === taskIndex
+                            ? {
+                                ...task,
+                                acceptance_criteria: value
+                                  .split('\n')
+                                  .map((item) => item.trim())
+                                  .filter(Boolean),
+                              }
+                            : task,
+                        ),
+                      }
+                    : story,
+                ),
+              }
+            : feature,
+        ),
+      };
+    });
+  }
+  trackByIndex(index: number): number {
+    return index;
   }
 }
 

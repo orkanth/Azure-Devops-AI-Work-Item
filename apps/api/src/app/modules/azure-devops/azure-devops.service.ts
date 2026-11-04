@@ -67,6 +67,7 @@ export interface CreateAzureDevOpsWorkItemInput {
   assignedTo?: string;
   priority?: 'Low' | 'Medium' | 'High';
   parentId?: number;
+  tags?: string;
 }
 
 @Injectable()
@@ -314,6 +315,13 @@ export class AzureDevOpsService {
         value: input.assignedTo,
       });
     }
+    if (input.tags?.trim()) {
+      patch.push({
+        op: 'add',
+        path: '/fields/System.Tags',
+        value: input.tags.trim(),
+      });
+    }
 
     if (input.priority) {
       const priorityMap = {
@@ -518,5 +526,52 @@ export class AzureDevOpsService {
     };
 
     await this.requestJson<void>(url, headers, { method: 'DELETE' });
+  }
+
+  async findWorkItemIdsByTag(
+    tag: string,
+    workItemType = 'Epic',
+  ): Promise<number[]> {
+    const organization = this.getRequiredConfig('AZURE_DEVOPS_ORG');
+    const project = this.getRequiredConfig('AZURE_DEVOPS_PROJECT');
+    const token = this.getRequiredConfig('AZURE_DEVOPS_PAT');
+
+    const apiVersion =
+      this.config.get<string>('AZURE_DEVOPS_API_VERSION') || '7.1';
+
+    const baseUrl =
+      `https://dev.azure.com/${encodeURIComponent(organization)}` +
+      `/${encodeURIComponent(project)}`;
+
+    const headers = {
+      Authorization: `Basic ${Buffer.from(`:${token}`).toString('base64')}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    };
+
+    const escapedTag = this.escapeWiql(tag);
+    const escapedType = this.escapeWiql(workItemType);
+
+    const wiql = `
+    SELECT [System.Id]
+    FROM WorkItems
+    WHERE [System.TeamProject] = @project
+      AND [System.WorkItemType] = '${escapedType}'
+      AND [System.Tags] CONTAINS '${escapedTag}'
+    ORDER BY [System.Id] DESC
+  `;
+
+    const params = new URLSearchParams({
+      'api-version': apiVersion,
+    });
+
+    const url = `${baseUrl}/_apis/wit/wiql?${params.toString()}`;
+
+    const result = await this.requestJson<WiqlQueryResponse>(url, headers, {
+      method: 'POST',
+      body: JSON.stringify({ query: wiql }),
+    });
+
+    return (result.workItems ?? []).map((item) => item.id);
   }
 }
