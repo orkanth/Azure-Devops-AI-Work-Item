@@ -28,7 +28,7 @@ export interface WorkItem {
 export type WorkItemActionKind = 'create' | 'update' | 'assign' | 'delete';
 
 export interface PromptProposal {
-  kind: WorkItemActionKind | 'ambiguous' | 'unknown';
+  kind: WorkItemActionKind | 'ambiguous' | 'unknown' | 'board';
   actionKind?: WorkItemActionKind;
   description: string;
   target?: WorkItem;
@@ -37,4 +37,31 @@ export interface PromptProposal {
   changes?: Partial<WorkItem>;
   assignee?: string;
   error?: string;
+  board?: BoardProposal;
+  proposalSource?: 'prompt' | 'document';
+}
+
+export interface BoardTaskProposal {
+  title: string;
+  description: string;
+  acceptanceCriteria: string;
+}
+
+export interface BoardUserStoryProposal {
+  title: string;
+  description: string;
+  acceptanceCriteria: string;
+  tasks: BoardTaskProposal[];
+}
+
+export interface BoardFeatureProposal {
+  title: string;
+  description: string;
+  user_stories: BoardUserStoryProposal[];
+}
+
+export interface BoardProposal {
+  title: string;
+  description: string;
+  features: BoardFeatureProposal[];
 }

@@ -7,7 +7,7 @@ from app.core.config import settings
 app = FastAPI(
     title=settings.ai_service_name,
     version=settings.ai_service_version,
-    description="AI-powered Azure DevOps work item generation",
+    description="AI-powered enterprise work item generation and orchestration",
 )
 
 # Allow requests from your local Angular development server.

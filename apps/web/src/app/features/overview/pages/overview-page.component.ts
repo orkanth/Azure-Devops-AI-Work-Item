@@ -63,18 +63,22 @@ export class OverviewPageComponent {
   startEdit(item: WorkItem): void {
     this.navigation.requestEdit(item);
   }
-
   submitPrompt(): void {
     if (!this.promptText.trim()) return;
 
-    this.pendingProposal = this.promptService.interpret(this.promptText, this.items());
+    this.pendingProposal = this.promptService.interpret(
+      this.promptText,
+      this.items(),
+    );
+
     this.deleteAcknowledged = false;
     this.feedback.clear();
   }
 
   selectCandidate(item: WorkItem): void {
     const proposal = this.pendingProposal;
-    if (!proposal || proposal.kind !== 'ambiguous' || !proposal.actionKind) return;
+    if (!proposal || proposal.kind !== 'ambiguous' || !proposal.actionKind)
+      return;
 
     const actionKind = proposal.actionKind;
     this.pendingProposal = {
@@ -98,7 +102,11 @@ export class OverviewPageComponent {
     if (!proposal || ['unknown', 'ambiguous'].includes(proposal.kind)) return;
 
     try {
-      if (proposal.kind === 'create' && proposal.newItem?.type && proposal.newItem.title) {
+      if (
+        proposal.kind === 'create' &&
+        proposal.newItem?.type &&
+        proposal.newItem.title
+      ) {
         const created = await this.workItemStore.create({
           type: proposal.newItem.type,
           title: proposal.newItem.title,
@@ -107,7 +115,9 @@ export class OverviewPageComponent {
           priority: proposal.newItem.priority ?? 'Medium',
           parentId: proposal.newItem.parentId,
         });
-        this.finishAction(`Created demo ${created.type} #${created.id}: ${created.title}`);
+        this.finishAction(
+          `Created demo ${created.type} #${created.id}: ${created.title}`,
+        );
         return;
       }
 
@@ -127,7 +137,9 @@ export class OverviewPageComponent {
         await this.workItemStore.update(proposal.target.id, {
           assignedTo: proposal.assignee,
         });
-        this.finishAction(`Assigned demo work item #${proposal.target.id} to ${proposal.assignee}`);
+        this.finishAction(
+          `Assigned demo work item #${proposal.target.id} to ${proposal.assignee}`,
+        );
         return;
       }
 
@@ -158,7 +170,8 @@ export class OverviewPageComponent {
     item: WorkItem,
     previous: PromptProposal,
   ): string {
-    if (kind === 'delete') return `Delete ${item.type} #${item.id}: “${item.title}”`;
+    if (kind === 'delete')
+      return `Delete ${item.type} #${item.id}: “${item.title}”`;
     if (kind === 'assign') {
       return `Assign ${item.type} #${item.id} to ${previous.assignee ?? 'the selected user'}`;
     }

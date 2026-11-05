@@ -7,7 +7,9 @@ import { CreateWorkItemDto } from './dto/create-work-item.dto';
 import { UpdateWorkItemDto } from './dto/update-work-item.dto';
 import { DeleteWorkItemDto } from './dto/delete-work-item.dto';
 import { PublishEpicDto } from './dto/publish-work-items.dto';
+import { NotFoundException } from '@nestjs/common';
 import { CreateAzureDevOpsWorkItemInput } from '../azure-devops/azure-devops.service';
+
 export interface WorkItemResponse {
   id: number;
   title: string;
@@ -303,5 +305,20 @@ export class WorkItemsService {
       created,
       errors,
     };
+  }
+
+  async findOne(id: number): Promise<WorkItemResponse> {
+    const [items, displayNames] = await Promise.all([
+      this.azureDevOpsService.getWorkItems(),
+      this.azureDevOpsService.getUserDisplayNames(),
+    ]);
+
+    const item = items.find((workItem) => workItem.id === id);
+
+    if (!item) {
+      throw new NotFoundException(`Work item ${id} not found`);
+    }
+
+    return this.mapWorkItem(item, displayNames);
   }
 }

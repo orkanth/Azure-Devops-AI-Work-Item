@@ -56,4 +56,9 @@ export class WorkItemsController {
   publish(@Body() dto: PublishEpicDto) {
     return this.workItemsService.publish(dto);
   }
+
+  @Get(':id')
+  findOne(@Param('id') id: string) {
+    return this.workItemsService.findOne(Number(id));
+  }
 }
