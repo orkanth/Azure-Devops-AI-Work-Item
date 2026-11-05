@@ -88,3 +88,135 @@
     margin-top: 22px;
   }
 }
+
+.ai-processing {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;  
+  gap: 12px; 
+  margin-top: 16px;
+    border: 1px solid #e6e8f4;
+  border-radius: 10px;
+  background: #fff;
+  color: #333;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.ai-processing > i {
+  font-size: 1.5rem;
+  color: var(--primary-color);
+}
+
+.ai-processing p {
+  margin: 4px 0 0;
+  color: var(--text-color-secondary);
+}
+/* AI generation feedback */
+.generation-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  margin-top: 16px;
+  border: 1px solid #bbebd0;
+  border-radius: 10px;
+  background: #ecfdf3;
+  color: #167a45;
+  font-size: 14px;
+  line-height: 1.5;
+  animation: notice-slide-in 0.2s ease-out;
+}
+
+.generation-notice i.pi-check-circle {
+  font-size: 19px;
+  flex-shrink: 0;
+}
+
+.generation-notice span {
+  flex: 1;
+}
+
+.generation-notice button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.generation-notice button:hover {
+  background: rgb(22 122 69 / 10%);
+}
+
+@keyframes notice-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Shared notification styles */
+.generation-notice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  margin-top: 16px;
+  border: 1px solid;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.generation-notice span {
+  flex: 1;
+}
+
+.generation-notice button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* Success */
+.generation-notice-success {
+  color: #167a45;
+  background: #ecfdf3;
+  border-color: #bbebd0;
+}
+
+/* Error */
+.generation-notice-error {
+  color: #b42318;
+  background: #fef3f2;
+  border-color: #fecdca;
+}
+
+.generation-notice-error button:hover {
+  background: rgb(180 35 24 / 10%);
+}
+
+.generation-notice-success button:hover {
+  background: rgb(22 122 69 / 10%);
+}
+

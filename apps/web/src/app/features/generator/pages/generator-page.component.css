@@ -1,0 +1,96 @@
+
+.generator-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px;
+}
+
+.page-header h1 {
+  margin: 0 0 8px;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.page-header p {
+  color: var(--text-color-secondary);
+  margin: 0;
+}
+
+.generator-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px;
+  border: 1px solid var(--surface-border);
+  border-radius: 12px;
+  background: var(--surface-card);
+}
+
+.generator-form label {
+  font-weight: 600;
+}
+
+.generator-form textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 12px;
+  border: 1px solid var(--surface-border);
+  border-radius: 8px;
+  font: inherit;
+  background: var(--surface-ground);
+  color: var(--text-color);
+}
+
+.generator-form button {
+  align-self: flex-start;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 8px;
+  background: var(--primary-color);
+  color: white;
+  cursor: pointer;
+}
+
+.generator-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.error-message {
+  padding: 12px;
+  border-radius: 8px;
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.loading-message {
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--surface-card);
+  color: var(--text-color-secondary);
+}
+
+.generated-board {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.feature {
+  padding: 20px;
+  border: 1px solid var(--surface-border);
+  border-radius: 12px;
+  background: var(--surface-card);
+}
+
+.user-story {
+  margin-top: 16px;
+  padding: 16px;
+  border-left: 3px solid var(--primary-color);
+  background: var(--surface-ground);
+}
+
+.user-story li {
+  margin-bottom: 6px;
+}

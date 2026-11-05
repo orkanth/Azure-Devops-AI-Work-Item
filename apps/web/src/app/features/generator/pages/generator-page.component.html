@@ -1,0 +1,84 @@
+
+<section class="generator-page">
+  <header class="page-header">
+    <h1>AI Board Generator</h1>
+    <p>
+      Transform your business requirements into structured
+      Epics, Features, User Stories and Tasks.
+    </p>
+  </header>
+
+  <section class="generator-form">
+    <label for="requirement">Business Requirement</label>
+
+    <textarea
+      id="requirement"
+      rows="6"
+      placeholder="Describe your business requirement..."
+      [value]="requirement()"
+      (input)="requirement.set($any($event.target).value)"
+    ></textarea>
+
+    <button
+      type="button"
+      (click)="generateBoard()"
+      [disabled]="isGenerating() || requirement().trim().length < 10"
+    >
+      @if (isGenerating()) {
+        Generating...
+      } @else {
+        Generate Board
+      }
+    </button>
+  </section>
+
+  @if (errorMessage(); as error) {
+    <div class="error-message" role="alert">
+      {{ error }}
+    </div>
+  }
+
+  @if (isGenerating()) {
+    <div class="loading-message" role="status">
+      AI is analysing your requirement and generating the work-item hierarchy...
+    </div>
+  }
+
+  @if (generatedEpic(); as epic) {
+    <section class="generated-board">
+      <h2>{{ epic.title }}</h2>
+      <p>{{ epic.description }}</p>
+
+      @for (feature of epic.features; track $index) {
+        <article class="feature">
+          <h3>Feature: {{ feature.title }}</h3>
+          <p>{{ feature.description }}</p>
+
+          @for (story of feature.user_stories; track $index) {
+            <div class="user-story">
+              <h4>User Story: {{ story.title }}</h4>
+              <p>{{ story.description }}</p>
+
+              <strong>Acceptance Criteria</strong>
+              <ul>
+                @for (criterion of story.acceptance_criteria; track $index) {
+                  <li>{{ criterion }}</li>
+                }
+              </ul>
+
+              <strong>Tasks</strong>
+              <ul>
+                @for (task of story.tasks; track $index) {
+                  <li>
+                    <strong>{{ task.title }}</strong>
+                    <p>{{ task.description }}</p>
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+        </article>
+      }
+    </section>
+  }
+</section>

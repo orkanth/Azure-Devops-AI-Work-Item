@@ -51,6 +51,17 @@ export const appRoutes: Routes = [
       },
     ],
   },
+
+  {
+    path: 'generator',
+    title: 'WorkPilot AI | AI Board Generator',
+    data: { pageTitle: 'AI Board Generator' },
+    loadComponent: () =>
+      import(
+        './features/generator/pages/generator-page.component'
+      ).then(({ GeneratorPageComponent }) => GeneratorPageComponent),
+  },
+
   {
     path: '**',
     redirectTo: '',

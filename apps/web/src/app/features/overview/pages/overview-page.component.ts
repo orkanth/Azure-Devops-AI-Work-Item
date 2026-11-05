@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { AppFeedbackService } from '../../../core/services/app-feedback.service';
 import { PromptCommandService } from '../../../core/services/prompt-command.service';
 import { WorkspaceNavigationService } from '../../../core/services/workspace-navigation.service';
@@ -11,15 +11,14 @@ import {
   WorkItemType,
 } from '../../../shared/models/work-item.model';
 import { WORK_ITEM_STORE } from '../../work-items/data-access/work-item-store';
-import { CommandProposalComponent } from '../components/command-proposal/command-proposal.component';
 import { OverviewStatsComponent } from '../components/overview-stats/overview-stats.component';
 import { PromptComposerComponent } from '../components/prompt-composer/prompt-composer.component';
+import { BoardGenerationService } from '../../generator/data-access/board-generation.service';
 
 @Component({
   selector: 'app-overview-page',
   standalone: true,
   imports: [
-    CommandProposalComponent,
     OverviewStatsComponent,
     PromptComposerComponent,
     WorkItemTableComponent,
@@ -32,7 +31,7 @@ export class OverviewPageComponent {
   private readonly promptService = inject(PromptCommandService);
   private readonly feedback = inject(AppFeedbackService);
   private readonly navigation = inject(WorkspaceNavigationService);
-
+  private readonly boardGenerationService = inject(BoardGenerationService);
   constructor() {
     effect(() => {
       const prompt = this.navigation.promptSeed();
@@ -51,7 +50,9 @@ export class OverviewPageComponent {
     'Move API validation to Done',
     'Delete task #106',
   ];
-
+  readonly isGeneratingBoard = signal(false);
+  readonly generationError = signal<string | null>(null);
+  readonly generationSuccess = signal<string | null>(null);
   promptText = '';
   pendingProposal: PromptProposal | null = null;
   deleteAcknowledged = false;
@@ -63,16 +64,60 @@ export class OverviewPageComponent {
   startEdit(item: WorkItem): void {
     this.navigation.requestEdit(item);
   }
-  submitPrompt(): void {
-    if (!this.promptText.trim()) return;
+  async submitPrompt(): Promise<void> {
+    const prompt = this.promptText.trim();
 
-    this.pendingProposal = this.promptService.interpret(
-      this.promptText,
-      this.items(),
-    );
+    if (!prompt) return;
+
+    this.feedback.clear();
+
+    // Temporary deterministic routing.
+    // We will replace this with LLM-based intent detection later.
+    if (this.isBoardGenerationRequest(prompt)) {
+      await this.generateBoard(prompt);
+      return;
+    }
+
+    // Preserve the existing command functionality.
+    this.pendingProposal = this.promptService.interpret(prompt, this.items());
 
     this.deleteAcknowledged = false;
-    this.feedback.clear();
+  }
+  private isBoardGenerationRequest(prompt: string): boolean {
+    return (
+      /\b(generate|build|create)\b.*\b(board|work item hierarchy|epic)\b/i.test(
+        prompt,
+      ) ||
+      /\b(generate|create)\b.*\b(epics|features|user stories)\b/i.test(prompt)
+    );
+  }
+
+  private async generateBoard(prompt: string): Promise<void> {
+    this.isGeneratingBoard.set(true);
+    this.generationSuccess.set(null);
+    this.generationError.set(null);
+
+    try {
+      const response = await this.boardGenerationService.generateBoard({
+        requirement: prompt,
+      });
+
+      if (!response.epic) {
+        throw new Error('No Epic was returned by the AI service.');
+      }
+
+      this.promptText = '';
+
+      this.generationSuccess.set(
+        'AI-generated work-item hierarchy created successfully!',
+      );
+    } catch (error) {
+      console.error('Board generation failed:', error);
+
+      this.generationError.set('Board generation failed. Please try again.');
+    } finally {
+      this.isGeneratingBoard.set(false);
+    }
   }
 
   selectCandidate(item: WorkItem): void {

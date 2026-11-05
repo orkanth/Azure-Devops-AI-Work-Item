@@ -1,36 +1,81 @@
 <section class="welcome-row">
   <div>
     <div class="eyebrow">
-      <span class="eyebrow-sparkle"><i class="pi pi-sparkles" aria-hidden="true"></i></span>
+      <span class="eyebrow-sparkle"
+        ><i class="pi pi-sparkles" aria-hidden="true"></i
+      ></span>
       YOUR AI WORKSPACE
     </div>
     <h1>Make work happen <span>with AI.</span></h1>
     <p class="welcome-subtitle">
-      Create, update, assign and manage Azure DevOps work items using natural language.
+      Create, update, assign and manage Azure DevOps work items using natural
+      language.
     </p>
   </div>
-  <button type="button" class="button button-secondary" (click)="navigateToWorkItems()">
+  <button
+    type="button"
+    class="button button-secondary"
+    (click)="navigateToWorkItems()"
+  >
     <i class="pi pi-list" aria-hidden="true"></i> Browse work items
   </button>
 </section>
 
 <app-overview-stats [stats]="stats()"></app-overview-stats>
+@if (generationSuccess(); as message) {
+  <div class="generation-notice" role="status" aria-live="polite">
+    <i class="pi pi-check-circle" aria-hidden="true"></i>
 
+    <span>{{ message }}</span>
+
+    <button
+      type="button"
+      (click)="generationSuccess.set(null)"
+      aria-label="Dismiss notification"
+    >
+      <i class="pi pi-times" aria-hidden="true"></i>
+    </button>
+  </div>
+ 
+}
+
+@if (generationError()) {
+  <div class="generation-notice generation-notice-error" role="alert">
+    <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
+    <span>{{ generationError() }}</span>
+    <button
+      type="button"
+      class="notice-close"
+      (click)="generationError.set(null)"
+      aria-label="Dismiss notification"
+    >
+      <i class="pi pi-times" aria-hidden="true"></i>
+    </button>
+  </div>
+}
+@if (isGeneratingBoard()) {
+  <div class="ai-processing" role="status" aria-live="polite">
+    <i class="pi pi-spin pi-spinner"></i>
+
+    <div>
+      <strong>WorkPilot AI is working...</strong>
+      <p>Analysing your requirement and generating the work items.</p>
+    </div>
+  </div>
+}
 <app-prompt-composer
   [promptText]="promptText"
   [samplePrompts]="samplePrompts"
+  [isLoading]="isGeneratingBoard()"
+  title="What would you like to do?"
+  description="Create, update, assign and manage Azure DevOps work items using natural language."
+  placeholder="e.g. Create a user story, assign task #104 to Ravi, or show high-priority tasks..."
+  buttonLabel="Execute"
+  badgeLabel="AI COMMAND CENTRE"
   (promptTextChange)="promptText = $event"
   (commandSubmitted)="submitPrompt()"
 ></app-prompt-composer>
 
-<app-command-proposal
-  [proposal]="pendingProposal"
-  [deleteAcknowledged]="deleteAcknowledged"
-  (deleteAcknowledgedChange)="deleteAcknowledged = $event"
-  (candidateSelected)="selectCandidate($event)"
-  (dismissed)="dismissProposal()"
-  (confirmed)="applyProposal()"
-></app-command-proposal>
 
 <section class="recent-section">
   <div class="section-heading">
