@@ -14,7 +14,12 @@ import { WORK_ITEM_STORE } from '../../work-items/data-access/work-item-store';
 import { OverviewStatsComponent } from '../components/overview-stats/overview-stats.component';
 import { PromptComposerComponent } from '../components/prompt-composer/prompt-composer.component';
 import { BoardGenerationService } from '../../generator/data-access/board-generation.service';
-
+import { GeneratedBoardStore } from '../../work-items/data-access/generated-board.store';
+import { firstValueFrom } from 'rxjs';
+import {
+  ApiService,
+  PublishWorkItemsResponse,
+} from '../../../core/services/api.service';
 @Component({
   selector: 'app-overview-page',
   standalone: true,
@@ -32,6 +37,9 @@ export class OverviewPageComponent {
   private readonly feedback = inject(AppFeedbackService);
   private readonly navigation = inject(WorkspaceNavigationService);
   private readonly boardGenerationService = inject(BoardGenerationService);
+  private readonly generatedBoardStore = inject(GeneratedBoardStore);
+  private readonly apiService = inject(ApiService);
+
   constructor() {
     effect(() => {
       const prompt = this.navigation.promptSeed();
@@ -53,6 +61,7 @@ export class OverviewPageComponent {
   readonly isGeneratingBoard = signal(false);
   readonly generationError = signal<string | null>(null);
   readonly generationSuccess = signal<string | null>(null);
+  readonly isPublishingBoard = signal(false);
   promptText = '';
   pendingProposal: PromptProposal | null = null;
   deleteAcknowledged = false;
@@ -67,28 +76,43 @@ export class OverviewPageComponent {
   async submitPrompt(): Promise<void> {
     const prompt = this.promptText.trim();
 
-    if (!prompt) return;
+    console.log('Execute clicked:', prompt);
+
+    if (!prompt) {
+      console.warn('Prompt is empty');
+      return;
+    }
+
+    if (this.isGeneratingBoard()) {
+      console.warn('Generation already in progress');
+      return;
+    }
 
     this.feedback.clear();
 
-    // Temporary deterministic routing.
-    // We will replace this with LLM-based intent detection later.
-    if (this.isBoardGenerationRequest(prompt)) {
+    const isGeneration = this.isBoardGenerationRequest(prompt);
+
+    console.log('Board generation request:', isGeneration);
+
+    if (isGeneration) {
       await this.generateBoard(prompt);
       return;
     }
 
-    // Preserve the existing command functionality.
     this.pendingProposal = this.promptService.interpret(prompt, this.items());
+
+    console.log('Command proposal:', this.pendingProposal);
 
     this.deleteAcknowledged = false;
   }
   private isBoardGenerationRequest(prompt: string): boolean {
     return (
-      /\b(generate|build|create)\b.*\b(board|work item hierarchy|epic)\b/i.test(
+      /\b(generate|build|create|design|develop)\b.*\b(board|work item hierarchy|epic|epics|features|user stories)\b/i.test(
         prompt,
       ) ||
-      /\b(generate|create)\b.*\b(epics|features|user stories)\b/i.test(prompt)
+      /\b(generate|build|create|design|develop)\b.*\b(system|application|platform|solution)\b/i.test(
+        prompt,
+      )
     );
   }
 
@@ -98,6 +122,7 @@ export class OverviewPageComponent {
     this.generationError.set(null);
 
     try {
+      // 1. Generate hierarchy using FastAPI
       const response = await this.boardGenerationService.generateBoard({
         requirement: prompt,
       });
@@ -106,15 +131,19 @@ export class OverviewPageComponent {
         throw new Error('No Epic was returned by the AI service.');
       }
 
-      this.promptText = '';
+      // 2. Store generated hierarchy and publishId
+      this.generatedBoardStore.setGeneratedBoard(response.epic);
 
-      this.generationSuccess.set(
-        'AI-generated work-item hierarchy created successfully!',
-      );
+      // 3. Automatically publish to Azure DevOps
+      await this.publishGeneratedBoard();
+
+      this.promptText = '';
     } catch (error) {
       console.error('Board generation failed:', error);
 
-      this.generationError.set('Board generation failed. Please try again.');
+      this.generationError.set(
+        'Generation or publishing failed. Please check the operation and try again.',
+      );
     } finally {
       this.isGeneratingBoard.set(false);
     }
@@ -230,5 +259,61 @@ export class OverviewPageComponent {
       return `Update ${item.type} #${item.id}`;
     }
     return previous.description;
+  }
+  async publishGeneratedBoard(): Promise<void> {
+    const epic = this.generatedBoardStore.generatedEpic();
+    const publishId = this.generatedBoardStore.publishId();
+
+    if (!epic || !publishId || this.isPublishingBoard()) {
+      return;
+    }
+
+    this.isPublishingBoard.set(true);
+    this.generationError.set(null);
+
+    try {
+      const response = await firstValueFrom(
+        this.apiService.publishGeneratedBoard({
+          publishId,
+          title: epic.title,
+          description: epic.description,
+          features: epic.features,
+        }),
+      );
+
+      if (response.status !== 'completed' || !response.success) {
+        this.generationError.set(response.message);
+
+        console.error('Publishing result:', response);
+
+        return;
+      }
+
+      // Publishing completed successfully.
+      this.generatedBoardStore.clearGeneratedBoard();
+
+      // Refresh actual Azure DevOps work items.
+      try {
+        await this.workItemStore.refresh();
+
+        this.generationSuccess.set(
+          'Work items successfully created in Azure DevOps!',
+        );
+      } catch (refreshError) {
+        console.error('Board refresh failed:', refreshError);
+
+        this.generationSuccess.set(
+          'Work items were published successfully, but the Board could not refresh. Please refresh it again.',
+        );
+      }
+    } catch (error) {
+      console.error('Publishing failed:', error);
+
+      this.generationError.set(
+        'Publishing failed. The generated hierarchy has been retained.',
+      );
+    } finally {
+      this.isPublishingBoard.set(false);
+    }
   }
 }

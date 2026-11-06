@@ -23,8 +23,9 @@ export interface WorkItem {
   updatedAt: string;
   url?: string;
   isContextOnly?: boolean;
+ 
+  isDraft?: boolean;
 }
-
 export type WorkItemActionKind = 'create' | 'update' | 'assign' | 'delete';
 
 export interface PromptProposal {

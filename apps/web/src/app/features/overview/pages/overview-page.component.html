@@ -66,7 +66,7 @@
 <app-prompt-composer
   [promptText]="promptText"
   [samplePrompts]="samplePrompts"
-  [isLoading]="isGeneratingBoard()"
+ [isLoading]="isGeneratingBoard() || isPublishingBoard()"
   title="What would you like to do?"
   description="Create, update, assign and manage Azure DevOps work items using natural language."
   placeholder="e.g. Create a user story, assign task #104 to Ravi, or show high-priority tasks..."

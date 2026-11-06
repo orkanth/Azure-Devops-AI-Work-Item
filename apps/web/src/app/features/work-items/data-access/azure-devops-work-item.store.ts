@@ -33,58 +33,56 @@ export class AzureDevOpsWorkItemStore implements WorkItemStore {
     sortBy: 'id',
     sortOrder: 'DESC',
   };
-  
-  async refresh(): Promise<void> {
-  const response = await firstValueFrom(
-    this.apiService.getWorkItems({
-      page: 1,
-      pageSize: 200,
-      sortBy: 'id',
-      sortOrder: 'DESC',
-    }),
-  );
 
-  if (!Array.isArray(response)) {
-    console.error('Unexpected API response:', response);
-    throw new Error('Invalid work items API response.');
+  async refresh(): Promise<void> {
+    const response = await firstValueFrom(
+      this.apiService.getWorkItems({
+        page: 1,
+        pageSize: 200,
+        sortBy: 'id',
+        sortOrder: 'DESC',
+      }),
+    );
+
+    if (!Array.isArray(response)) {
+      console.error('Unexpected API response:', response);
+      throw new Error('Invalid work items API response.');
+    }
+
+    this._items.set(response.map((item) => this.mapWorkItem(item)));
+
+    this._totalRecords.set(response.length);
   }
 
-  this._items.set(
-    response.map((item) => this.mapWorkItem(item)),
-  );
-
-  this._totalRecords.set(response.length);
-}
-  
   async create(item: Omit<WorkItem, 'id' | 'updatedAt'>): Promise<WorkItem> {
-  const payload: CreateApiWorkItemRequest = {
-    type: item.type,
-    title: item.title,
-    description: item.description,
-    acceptanceCriteria: item.acceptanceCriteria,
-    assignedTo:
-      item.assignedToEmail ||
-      (item.assignedTo !== 'Unassigned' ? item.assignedTo : undefined),
-    priority: item.priority,
-    parentId: item.parentId,
-  };
+    const payload: CreateApiWorkItemRequest = {
+      type: item.type,
+      title: item.title,
+      description: item.description,
+      acceptanceCriteria: item.acceptanceCriteria,
+      assignedTo:
+        item.assignedToEmail ||
+        (item.assignedTo !== 'Unassigned' ? item.assignedTo : undefined),
+      priority: item.priority,
+      parentId: item.parentId,
+    };
 
-  // Call POST instead of GET.
-  const response = await firstValueFrom(
-    this.apiService.createWorkItem(payload),
-  );
+    // Call POST instead of GET.
+    const response = await firstValueFrom(
+      this.apiService.createWorkItem(payload),
+    );
 
-  // POST returns one work item, not a paginated collection.
-  const created = this.mapWorkItem(response);
+    // POST returns one work item, not a paginated collection.
+    const created = this.mapWorkItem(response);
 
-  // Update local state only after Azure DevOps confirms creation.
-  this._items.update((current) => [
-    created,
-    ...current.filter((existing) => existing.id !== created.id),
-  ]);
+    // Update local state only after Azure DevOps confirms creation.
+    this._items.update((current) => [
+      created,
+      ...current.filter((existing) => existing.id !== created.id),
+    ]);
 
-  return created;
-}
+    return created;
+  }
 
   async update(
     id: number,

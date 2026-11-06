@@ -207,9 +207,24 @@ export class WorkItemsService {
 
     const createItem = async (
       input: CreateAzureDevOpsWorkItemInput,
+      itemTag: string,
     ): Promise<number | null> => {
       try {
-        const item = await this.azureDevOpsService.createWorkItem(input);
+        // Check whether this exact hierarchy item already exists.
+        const existingIds = await this.azureDevOpsService.findWorkItemIdsByTag(
+          itemTag,
+          input.type,
+        );
+
+        const existingId = existingIds[0];
+
+        if (existingId !== undefined) {
+          return existingId;
+        }
+        const item = await this.azureDevOpsService.createWorkItem({
+          ...input,
+          tags: itemTag,
+        });
 
         created.push({
           id: item.id,
@@ -235,12 +250,14 @@ export class WorkItemsService {
     };
 
     // 1. Create the Epic.
-    const epicId = await createItem({
-      type: 'Epic',
-      title: dto.title,
-      description: dto.description,
-      tags: publishTag,
-    });
+    const epicId = await createItem(
+      {
+        type: 'Epic',
+        title: dto.title,
+        description: dto.description,
+      },
+      publishTag,
+    );
 
     // Without an Epic, the hierarchy cannot be created.
     if (epicId === null) {
@@ -254,42 +271,43 @@ export class WorkItemsService {
     }
 
     // 2. Create Features under the Epic.
-    for (const feature of dto.features) {
-      const featureId = await createItem({
-        type: 'Feature',
-        title: feature.title,
-        description: feature.description,
-        parentId: epicId,
-      });
+    for (const [featureIndex, feature] of dto.features.entries()) {
+      const featureId = await createItem(
+        {
+          type: 'Feature',
+          title: feature.title,
+          description: feature.description,
+          parentId: epicId,
+        },
+        `${publishTag}-Feature-${featureIndex}`,
+      );
 
-      // Skip this Feature's descendants if its creation failed.
-      if (featureId === null) {
-        continue;
-      }
+      if (featureId === null) continue;
 
-      // 3. Create User Stories under each Feature.
-      for (const story of feature.user_stories) {
-        const storyId = await createItem({
-          type: 'User Story',
-          title: story.title,
-          description: story.description,
-          acceptanceCriteria: story.acceptance_criteria.join('\n'),
-          parentId: featureId,
-        });
+      for (const [storyIndex, story] of feature.user_stories.entries()) {
+        const storyId = await createItem(
+          {
+            type: 'User Story',
+            title: story.title,
+            description: story.description,
+            acceptanceCriteria: story.acceptance_criteria.join('\n'),
+            parentId: featureId,
+          },
+          `${publishTag}-Feature-${featureIndex}-Story-${storyIndex}`,
+        );
 
-        // Skip this Story's Tasks if its creation failed.
-        if (storyId === null) {
-          continue;
-        }
+        if (storyId === null) continue;
 
-        // 4. Create Tasks under each User Story.
-        for (const task of story.tasks) {
-          await createItem({
-            type: 'Task',
-            title: task.title,
-            description: task.description,
-            parentId: storyId,
-          });
+        for (const [taskIndex, task] of story.tasks.entries()) {
+          await createItem(
+            {
+              type: 'Task',
+              title: task.title,
+              description: task.description,
+              parentId: storyId,
+            },
+            `${publishTag}-Feature-${featureIndex}-Story-${storyIndex}-Task-${taskIndex}`,
+          );
         }
       }
     }

@@ -3,6 +3,7 @@ import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { WorkItemsQuery } from '../../shared/models/work-items-query.model';
+import { GeneratedFeature } from '../../shared/models/generated-board.model';
 export interface ApiHealth {
   status: string;
   service: string;
@@ -48,6 +49,32 @@ export interface UpdateApiWorkItemRequest {
   assignedTo?: string;
   priority?: string;
 }
+export interface PublishEpicRequest {
+  publishId: string;
+  title: string;
+  description: string;
+  features: GeneratedFeature[];
+}
+
+export interface PublishWorkItemsResponse {
+  success: boolean;
+  status: 'completed' | 'partial' | 'failed' | 'already-published';
+  message: string;
+  existingEpicId?: number;
+  created: Array<{
+    id: number;
+    type: string;
+    title: string;
+    parentId?: number;
+    url: string;
+  }>;
+  errors: Array<{
+    type: string;
+    title: string;
+    message: string;
+  }>;
+}
+
 @Injectable({
   providedIn: 'root',
 })
@@ -99,6 +126,15 @@ export class ApiService {
       {
         body: { confirm: true },
       },
+    );
+  }
+
+  publishGeneratedBoard(
+    request: PublishEpicRequest,
+  ): Observable<PublishWorkItemsResponse> {
+    return this.http.post<PublishWorkItemsResponse>(
+      `${this.baseUrl}/work-items/publish`,
+      request,
     );
   }
 }

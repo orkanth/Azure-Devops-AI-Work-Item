@@ -220,31 +220,10 @@ export class AzureDevOpsService {
   }
 
   async getUserDisplayNames(): Promise<Map<string, string>> {
-    const organization = this.getRequiredConfig('AZURE_DEVOPS_ORG');
-    const token = this.getRequiredConfig('AZURE_DEVOPS_PAT');
-
-    const url = new URL(
-      `https://vssps.dev.azure.com/${encodeURIComponent(organization)}` +
-        '/_apis/graph/users',
-    );
-
-    url.searchParams.set('subjectTypes', 'user');
-    url.searchParams.set('api-version', '7.1-preview.1');
-
-    const headers = {
-      Authorization: `Basic ${Buffer.from(`:${token}`).toString('base64')}`,
-      Accept: 'application/json',
-    };
-
-    const response = await this.requestJson<GraphUsersResponse>(
-      url.toString(),
-      headers,
-      { method: 'GET' },
-    );
-
+    const users = await this.getGraphUsers();
     const displayNames = new Map<string, string>();
 
-    for (const user of response.value ?? []) {
+    for (const user of users) {
       const name = user.displayName?.trim();
 
       if (!name) continue;
@@ -573,5 +552,42 @@ export class AzureDevOpsService {
     });
 
     return (result.workItems ?? []).map((item) => item.id);
+  }
+
+  private async getGraphUsers(): Promise<AzureDevOpsGraphUser[]> {
+    const organization = this.getRequiredConfig('AZURE_DEVOPS_ORG');
+    const token = this.getRequiredConfig('AZURE_DEVOPS_PAT');
+
+    const url = new URL(
+      `https://vssps.dev.azure.com/${encodeURIComponent(organization)}` +
+        '/_apis/graph/users',
+    );
+
+    url.searchParams.set('subjectTypes', 'user');
+    url.searchParams.set('api-version', '7.1-preview.1');
+
+    const headers = {
+      Authorization: `Basic ${Buffer.from(`:${token}`).toString('base64')}`,
+      Accept: 'application/json',
+    };
+
+    const response = await this.requestJson<GraphUsersResponse>(
+      url.toString(),
+      headers,
+      { method: 'GET' },
+    );
+
+    return response.value ?? [];
+  }
+
+  async findUsersByDisplayName(
+    displayName: string,
+  ): Promise<AzureDevOpsGraphUser[]> {
+    const users = await this.getGraphUsers();
+    const searchName = displayName.trim().toLowerCase();
+
+    return users.filter(
+      (user) => user.displayName?.trim().toLowerCase() === searchName,
+    );
   }
 }
