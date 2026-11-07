@@ -31,8 +31,7 @@ async function bootstrap() {
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
-  await app.listen(port);
+  SwaggerModule.setup('api', app, document); 
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -40,6 +39,8 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
+  await app.listen(port);
   Logger.log(
     `Application is running on: http://localhost:${port}/${globalPrefix}`,
   );

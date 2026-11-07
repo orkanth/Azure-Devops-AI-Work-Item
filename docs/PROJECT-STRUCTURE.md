@@ -5,7 +5,7 @@
 - `apps/web`: Angular user interface. Feature areas are generator, review, and publish; `core` contains app-wide services/interceptors/auth; `shared` contains reusable UI and models.
 - `apps/api`: NestJS application API. Owns request validation, authentication/authorization, generation sessions, document metadata, approvals, and API coordination.
 - `services/ai-service`: FastAPI AI service. Owns document extraction, chunking, embeddings/retrieval, LLM calls, structured work-item generation, and the LangGraph workflow.
-- `services/azure-devops-mcp`: FastMCP server. Exposes a small, validated set of tools that call Azure DevOps APIs.
+- `apps/integrations/azure-devops-mcp`: FastMCP server. Exposes a small, validated set of tools that call Azure DevOps APIs.
 - `packages/contracts`: JSON schemas and examples that document request/response shapes shared between services.
 - `infra`: local container configuration and infrastructure scripts.
 - `docs`: architecture diagrams, decisions (ADRs), API notes and setup guides.
@@ -25,7 +25,7 @@ Owns app-facing REST endpoints, authorization, request validation, approval reco
 
 Suggested graph stages: `parse_input -> retrieve_context (when useful) -> generate_hierarchy -> validate_hierarchy -> check_duplicates -> await_approval -> publish`. The publish stage should be gated by a verifiable approval from the application API; it should not execute merely because a model asks it to.
 
-### Azure DevOps MCP server (`services/azure-devops-mcp`)
+### Azure DevOps MCP server (`apps/integrations/azure-devops-mcp`)
 
 Start read-only with project/team/iteration discovery, supported work-item types, work-item search, and user identity search. Then add `create_work_item`, `update_work_item`, `delete_work_item`, `assign_work_item`, and `link_work_items`. All writes must independently enforce authorization and validation; deletes require explicit confirmation tied to the exact target IDs. See `FUNCTIONAL-REQUIREMENTS.md`.
 

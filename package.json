@@ -11,7 +11,7 @@
     "start:web": "nx serve web",
     "start:api": "nest start api --watch",
     "start:ai": "cd apps/ai-service && uv run uvicorn app.main:app --reload --port 8000",
-    "start:mcp": "cd services/azure-devops-mcp && uv run fastmcp run app.server:mcp",
+    "start:mcp": "cd apps/integrations/azure-devops-mcp && uv run fastmcp run app.server:mcp"
     "build": "npm run build:web && npm run build:api",
     "build:web": "nx build web",
     "build:api": "nest build api",
