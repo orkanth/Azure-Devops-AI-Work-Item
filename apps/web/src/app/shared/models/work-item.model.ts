@@ -26,7 +26,12 @@ export interface WorkItem {
  
   isDraft?: boolean;
 }
-export type WorkItemActionKind = 'create' | 'update' | 'assign' | 'delete';
+export type WorkItemActionKind =
+  | 'create'
+  | 'update'
+  | 'assign'
+  | 'delete'
+  | 'move';
 
 export interface PromptProposal {
   kind: WorkItemActionKind | 'ambiguous' | 'unknown' | 'board';
@@ -37,6 +42,7 @@ export interface PromptProposal {
   newItem?: Partial<WorkItem>;
   changes?: Partial<WorkItem>;
   assignee?: string;
+  newParent?: MoveWorkItemTarget;
   error?: string;
   board?: BoardProposal;
   proposalSource?: 'prompt' | 'document';
@@ -65,4 +71,9 @@ export interface BoardProposal {
   title: string;
   description: string;
   features: BoardFeatureProposal[];
+}
+export interface MoveWorkItemTarget {
+  id: number;
+  type: WorkItemType;
+  title: string;
 }
