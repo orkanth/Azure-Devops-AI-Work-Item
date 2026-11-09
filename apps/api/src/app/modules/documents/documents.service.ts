@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ConflictException,
   Inject,
   Injectable,
   InternalServerErrorException,
@@ -301,6 +302,119 @@ export class DocumentsService {
           document: true,
         },
       });
+    });
+  }
+
+  async completeIngestionJob(
+    jobId: string,
+  ): Promise<DocumentIngestionJobEntity> {
+    return this.dataSource.transaction(async (manager) => {
+      const jobsRepository = manager.getRepository(DocumentIngestionJobEntity);
+
+      const documentsRepository = manager.getRepository(DocumentEntity);
+
+      // 1. Find and lock the ingestion job.
+      const job = await jobsRepository.findOne({
+        where: { id: jobId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!job) {
+        throw new NotFoundException(`Ingestion job ${jobId} not found`);
+      }
+
+      // 2. Only processing jobs can be completed.
+      if (job.status !== IngestionJobStatus.PROCESSING) {
+        throw new ConflictException(
+          `Cannot complete job with status: ${job.status}`,
+        );
+      }
+
+      // 3. Mark the ingestion job as completed.
+      job.status = IngestionJobStatus.COMPLETED;
+      job.completedAt = new Date();
+      job.errorMessage = null;
+
+      await jobsRepository.save(job);
+
+      // 4. Update the associated document.
+      await documentsRepository.update(
+        { id: job.documentId },
+        {
+          status: DocumentStatus.INDEXED,
+          indexedAt: new Date(),
+        },
+      );
+
+      // 5. Return the completed job with document details.
+      return jobsRepository.findOne({
+        where: { id: job.id },
+        relations: { document: true },
+      }) as Promise<DocumentIngestionJobEntity>;
+    });
+  }
+
+  async failIngestionJob(
+    jobId: string,
+    errorMessage: string,
+  ): Promise<DocumentIngestionJobEntity> {
+    return this.dataSource.transaction(async (manager) => {
+      const jobsRepository = manager.getRepository(DocumentIngestionJobEntity);
+
+      const documentsRepository = manager.getRepository(DocumentEntity);
+
+      // 1. Find and lock the job.
+      const job = await jobsRepository.findOne({
+        where: { id: jobId },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!job) {
+        throw new NotFoundException(`Ingestion job ${jobId} not found`);
+      }
+
+      // 2. Only processing jobs can fail.
+      if (job.status !== IngestionJobStatus.PROCESSING) {
+        throw new ConflictException(
+          `Cannot fail job with status: ${job.status}`,
+        );
+      }
+
+      // 3. Store the error.
+      job.errorMessage = errorMessage;
+      console.log('Before save:', job.errorMessage);
+      // 4. Decide whether to retry or permanently fail.
+      const canRetry = job.attemptCount < job.maxAttempts;
+
+      job.status = canRetry
+        ? IngestionJobStatus.QUEUED
+        : IngestionJobStatus.FAILED;
+
+      if (!canRetry) {
+        job.completedAt = new Date();
+      }
+
+      await jobsRepository.save(job);
+      console.log('After save:', job.errorMessage);
+      // 5. Update the associated document.
+      // 5. Update the associated document.
+      await documentsRepository.update(
+        { id: job.documentId },
+        {
+          status: canRetry ? DocumentStatus.PENDING : DocumentStatus.FAILED,
+          indexedAt: null,
+        },
+      );
+
+      // 6. Return the updated job.
+      const updatedJob = await jobsRepository.findOne({
+        where: { id: job.id },
+        relations: { document: true },
+      });
+
+      console.log('After reload:', updatedJob?.errorMessage);
+
+      return updatedJob as DocumentIngestionJobEntity;
     });
   }
 }

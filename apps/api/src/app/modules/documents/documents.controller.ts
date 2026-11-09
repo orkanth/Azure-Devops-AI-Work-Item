@@ -43,10 +43,31 @@ export class DocumentsController {
   findIngestionJobs(@Query() dto: FindIngestionJobsDto) {
     return this.documentsService.findIngestionJobs(dto);
   }
+
   @Post('ingestion-jobs/claim')
   claimNextIngestionJob() {
     return this.documentsService.claimNextIngestionJob();
   }
+
+  @Post('ingestion-jobs/:jobId/complete')
+  completeIngestionJob(@Param('jobId', ParseUUIDPipe) jobId: string) {
+    return this.documentsService.completeIngestionJob(jobId);
+  }
+
+@Post('ingestion-jobs/:jobId/fail')
+failIngestionJob(
+  @Param('jobId', ParseUUIDPipe) jobId: string,
+  @Body('errorMessage') errorMessage: string,
+) {
+  console.log('Job ID:', jobId);
+  console.log('Error message:', errorMessage);
+
+  return this.documentsService.failIngestionJob(
+    jobId,
+    errorMessage,
+  );
+}
+
   @Get(':documentId')
   findById(@Param('documentId', ParseUUIDPipe) documentId: string) {
     return this.documentsService.findById(documentId);
