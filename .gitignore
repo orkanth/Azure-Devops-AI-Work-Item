@@ -51,6 +51,7 @@ pnpm-debug.log*
 chroma_data/
 local-data/
 uploads/
+local-data/documents/
 
 # ==========================================
 # IDE / Operating system
@@ -59,3 +60,4 @@ uploads/
 .idea/
 .DS_Store
 Thumbs.db
+

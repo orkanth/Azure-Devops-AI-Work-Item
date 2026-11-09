@@ -1,0 +1,36 @@
+
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Document Upload Metadata",
+  "description": "Metadata required when uploading a document to DevFlow AI.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "projectId",
+    "documentType"
+  ],
+  "properties": {
+    "projectId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "description": "Azure DevOps project identifier."
+    },
+    "documentType": {
+      "type": "string",
+      "enum": [
+        "TTD",
+        "API_SPECIFICATION",
+        "TECHNICAL_DESIGN",
+        "REQUIREMENTS",
+        "GENERAL"
+      ],
+      "description": "Classification of the uploaded document."
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 2000,
+      "description": "Optional description of the document."
+    }
+  }
+}
