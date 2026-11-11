@@ -15,6 +15,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { DocumentsService } from './documents.service';
 import { FindIngestionJobsDto } from './dto/find-ingestion-jobs.dto';
+import { AskDocumentQuestionDto } from './dto/ask-document-question.dto';
 
 @Controller('documents')
 export class DocumentsController {
@@ -54,22 +55,24 @@ export class DocumentsController {
     return this.documentsService.completeIngestionJob(jobId);
   }
 
-@Post('ingestion-jobs/:jobId/fail')
-failIngestionJob(
-  @Param('jobId', ParseUUIDPipe) jobId: string,
-  @Body('errorMessage') errorMessage: string,
-) {
-  console.log('Job ID:', jobId);
-  console.log('Error message:', errorMessage);
+  @Post('ingestion-jobs/:jobId/fail')
+  failIngestionJob(
+    @Param('jobId', ParseUUIDPipe) jobId: string,
+    @Body('errorMessage') errorMessage: string,
+  ) {
+    console.log('Job ID:', jobId);
+    console.log('Error message:', errorMessage);
 
-  return this.documentsService.failIngestionJob(
-    jobId,
-    errorMessage,
-  );
-}
+    return this.documentsService.failIngestionJob(jobId, errorMessage);
+  }
 
   @Get(':documentId')
   findById(@Param('documentId', ParseUUIDPipe) documentId: string) {
     return this.documentsService.findById(documentId);
+  }
+
+  @Post('ask')
+  askQuestion(@Body() dto: AskDocumentQuestionDto) {
+    return this.documentsService.askQuestion(dto);
   }
 }

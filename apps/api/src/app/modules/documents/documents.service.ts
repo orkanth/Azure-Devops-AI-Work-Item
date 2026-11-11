@@ -1,4 +1,5 @@
 import {
+  BadGatewayException,
   BadRequestException,
   ConflictException,
   Inject,
@@ -6,6 +7,7 @@ import {
   InternalServerErrorException,
   Logger,
   NotFoundException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createHash, randomUUID } from 'node:crypto';
@@ -22,7 +24,29 @@ import {
   IngestionJobStatus,
 } from './entities/document-ingestion-job.entity';
 import { FindIngestionJobsDto } from './dto/find-ingestion-jobs.dto';
+import { AskDocumentQuestionDto } from './dto/ask-document-question.dto';
+import { ConfigService } from '@nestjs/config';
 
+export interface DocumentSource {
+  source: number;
+  file_name: string;
+  document_id: string;
+  page_number: number | null;
+  chunk_index: number;
+  semantic_rank?: number | null;
+  keyword_rank?: number | null;
+  rrf_score?: number | null;
+}
+
+export interface AskDocumentQuestionResponse {
+  answer: string;
+  sources: DocumentSource[];
+}
+
+interface AiServiceResponse {
+  status: string;
+  data: AskDocumentQuestionResponse;
+}
 @Injectable()
 export class DocumentsService {
   private readonly logger = new Logger(DocumentsService.name);
@@ -38,6 +62,7 @@ export class DocumentsService {
     private readonly ingestionJobsRepository: Repository<DocumentIngestionJobEntity>,
 
     private readonly dataSource: DataSource,
+    private readonly configService: ConfigService,
   ) {}
 
   async upload(file: Express.Multer.File, dto: CreateDocumentDto) {
@@ -416,5 +441,65 @@ export class DocumentsService {
 
       return updatedJob as DocumentIngestionJobEntity;
     });
+  }
+
+  async askQuestion(
+    dto: AskDocumentQuestionDto,
+  ): Promise<AskDocumentQuestionResponse> {
+    const aiServiceUrl = this.configService
+      .get<string>('AI_SERVICE_URL', 'http://localhost:8000')
+      .replace(/\/+$/, '');
+
+    try {
+      const response = await fetch(`${aiServiceUrl}/api/v1/documents/ask`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          question: dto.question,
+          project_id: dto.project_id,
+          limit: dto.limit,
+        }),
+        signal: AbortSignal.timeout(120000),
+      });
+
+      if (!response.ok) {
+        const errorBody = await response.text();
+
+        this.logger.error(
+          `AI document service returned HTTP ${response.status}: ${errorBody}`,
+        );
+
+        throw new BadGatewayException(
+          'Document question-answering service could not process the request.',
+        );
+      }
+
+      const result = (await response.json()) as AiServiceResponse;
+
+      return result.data;
+    } catch (error: unknown) {
+      if (error instanceof BadGatewayException) {
+        throw error;
+      }
+
+      if (error instanceof Error && error.name === 'TimeoutError') {
+        this.logger.error('Document question-answering request timed out.');
+
+        throw new ServiceUnavailableException(
+          'Document question-answering took too long. Please try again.',
+        );
+      }
+
+      this.logger.error(
+        'Could not connect to document question-answering service.',
+        error instanceof Error ? error.stack : undefined,
+      );
+
+      throw new ServiceUnavailableException(
+        'Document question-answering service is currently unavailable.',
+      );
+    }
   }
 }

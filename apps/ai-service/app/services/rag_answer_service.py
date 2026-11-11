@@ -1,11 +1,13 @@
 import re
+import logging
+import time
 from openai import AsyncOpenAI
 
 from app.core.config import settings
 from app.services.rag_retrieval_service import RAGRetrievalService
 from app.rag.context_builder import RAGContextBuilder
 
-
+logger = logging.getLogger(__name__)
 class RAGAnswerService:
     """
     Generates answers using retrieved document context (RAG).
@@ -19,7 +21,7 @@ class RAGAnswerService:
         self.retrieval_service = RAGRetrievalService()
         self.context_builder = RAGContextBuilder()
 
-    async def answer_question(
+    async def answer_question( 
         self,
         question: str,
         project_id: str,
@@ -28,8 +30,9 @@ class RAGAnswerService:
         """
         Retrieve relevant document chunks and generate
         an answer grounded in the retrieved context.
-        """
-
+        """ 
+        total_start = time.perf_counter()
+        logger.info("[RAG] Starting question: %s", question)
         if not question or not question.strip():
             raise ValueError("Question cannot be empty.")
 
@@ -37,10 +40,25 @@ class RAGAnswerService:
             raise ValueError("Project ID is required.")
 
         # Step 1: Retrieve relevant document chunks.
-        chunks = await self.retrieval_service.retrieve(
-            question=question,
-            project_id=project_id,
-            limit=limit,
+        # Step 1: Retrieve relevant document chunks.
+        retrieval_start = time.perf_counter()
+
+        try:
+            chunks = await self.retrieval_service.retrieve(
+                question=question,
+                project_id=project_id,
+                limit=limit,
+            )
+        except Exception:
+            logger.exception("RAG retrieval failed.")
+            raise
+
+        retrieval_duration = time.perf_counter() - retrieval_start
+
+        logger.info(
+            "[RAG] Retrieval completed in %.2f seconds. Chunks: %d",
+            retrieval_duration,
+            len(chunks),
         )
 
         # Step 2: Handle cases where no documents are found.
@@ -112,20 +130,39 @@ class RAGAnswerService:
             Answer the user's question using the retrieved
             document context and include source references.
             """
-
+        logger.info(
+            "[RAG] Sending request to OpenAI. Model: %s",
+            settings.openai_model,
+        )
         # Step 6: Generate the answer using OpenAI.
-        response = await self.client.chat.completions.create(
-            model=settings.openai_model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": system_prompt,
-                },
-                {
-                    "role": "user",
-                    "content": user_prompt,
-                },
-            ],
+        llm_start = time.perf_counter()
+
+        try:
+            response = await self.client.chat.completions.create(
+                model=settings.openai_model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": system_prompt,
+                    },
+                    {
+                        "role": "user",
+                        "content": user_prompt,
+                    },
+                ],
+            )
+        except Exception:
+            logger.exception(
+                "[RAG] LLM request failed after %.2f seconds.",
+                time.perf_counter() - llm_start,
+            )
+            raise
+
+        llm_duration = time.perf_counter() - llm_start
+
+        logger.info(
+            "[RAG] LLM generation completed in %.2f seconds.",
+            llm_duration,
         )
 
         # Step 7: Extract the generated answer.
@@ -144,6 +181,10 @@ class RAGAnswerService:
         )
 
         # Step 9: Return answer and source references.
+        logger.info(
+            "[RAG] Total execution time: %.2f seconds.",
+            time.perf_counter() - total_start,
+        ) 
         return {
             "question": question,
             "answer": answer.strip(),
@@ -156,7 +197,6 @@ class RAGAnswerService:
         chunks: list[dict],
     ) -> list[dict]:
 
-        # Extract source numbers such as [Source 1], [Source 2].
         cited_numbers = {
             int(number)
             for number in re.findall(
@@ -169,7 +209,6 @@ class RAGAnswerService:
         sources = []
 
         for index, chunk in enumerate(chunks, start=1):
-
             if index not in cited_numbers:
                 continue
 
