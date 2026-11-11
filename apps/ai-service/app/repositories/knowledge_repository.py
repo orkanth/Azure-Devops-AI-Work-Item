@@ -56,71 +56,61 @@ class KnowledgeRepository:
         with self._get_connection() as connection:
             with connection.cursor() as cursor:
 
-                # Verify that this document belongs to this project.
-                cursor.execute(
-                    """
-                    SELECT project_id
-                    FROM documents
-                    WHERE id = %s
-                    """,
-                    (document_id,),
+                # Prepare the search query
+                terms = re.findall(r"[a-zA-Z0-9]+", query.lower())
+
+                stop_words = {
+                    "what", "are", "is", "the", "during",
+                    "a", "an", "of", "should", "does"
+                }
+
+                search_query = " | ".join(
+                    term for term in terms
+                    if term not in stop_words
                 )
 
-                document = cursor.fetchone()
+                if not search_query:
+                    return []
 
-                if document is None:
-                    raise ValueError("Document does not exist.")
-
-                if document[0] != project_id:
-                    raise ValueError(
-                        "Document does not belong to the supplied project."
-                    )
-
-                # Remove previous chunks for re-indexing.
+                # Execute SQL while cursor is available
                 cursor.execute(
                     """
-                    DELETE FROM knowledge_chunks
-                    WHERE document_id = %s
+                    SELECT
+                        kc.document_id,
+                        kc.project_id,
+                        d.file_name,
+                        kc.content,
+                        kc.chunk_index,
+                        kc.page_number,
+                        kc.metadata,
+                        ts_rank_cd(
+                            to_tsvector(
+                                'simple',
+                                replace(kc.content, '/', ' ')
+                            ),
+                            to_tsquery('simple', %s)
+                        ) AS keyword_score
+                    FROM knowledge_chunks kc
+                    JOIN documents d
+                        ON d.id = kc.document_id
+                    WHERE kc.project_id = %s
+                    AND to_tsvector(
+                        'simple',
+                        replace(kc.content, '/', ' ')
+                    ) @@ to_tsquery('simple', %s)
+                    ORDER BY keyword_score DESC
+                    LIMIT %s
                     """,
-                    (document_id,),
+                    (
+                        search_query,
+                        project_id,
+                        search_query,
+                        limit,
+                    ),
                 )
 
-                # Insert the new chunks.
-                for chunk in chunks:
-                    embedding = "[" + ",".join(
-                        str(float(value))
-                        for value in chunk["embedding"]
-                    ) + "]"
-
-                    cursor.execute(
-                        """
-                        INSERT INTO knowledge_chunks (
-                            document_id,
-                            project_id,
-                            content,
-                            chunk_index,
-                            page_number,
-                            metadata,
-                            embedding
-                        )
-                        VALUES (
-                            %s, %s, %s, %s, %s, %s, %s::vector
-                        )
-                        """,
-                        (
-                            document_id,
-                            project_id,
-                            chunk["content"],
-                            chunk["chunk_index"],
-                            chunk.get("page_number"),
-                            Jsonb(chunk.get("metadata", {})),
-                            embedding,
-                        ),
-                    )
-
-        # The connection context commits on success.
-        # Any exception causes the transaction to roll back.
-        return len(chunks)
+                rows = cursor.fetchall()
+    
     
     
     def search_similar_chunks(
@@ -133,7 +123,7 @@ class KnowledgeRepository:
         if len(query_embedding) != self.EMBEDDING_DIMENSIONS:
             raise ValueError("Invalid query embedding dimensions.")
 
-        if not project_id:
+        if not project_id or not project_id.strip():
             raise ValueError("Project ID is required.")
 
         if limit < 1 or limit > 50:
@@ -149,16 +139,19 @@ class KnowledgeRepository:
                 cursor.execute(
                     """
                     SELECT
-                        document_id,
-                        project_id,
-                        content,
-                        chunk_index,
-                        page_number,
-                        metadata,
-                        1 - (embedding <=> %s::vector) AS similarity
-                    FROM knowledge_chunks
-                    WHERE project_id = %s
-                    ORDER BY embedding <=> %s::vector
+                        kc.document_id,
+                        kc.project_id,
+                        d.file_name,
+                        kc.content,
+                        kc.chunk_index,
+                        kc.page_number,
+                        kc.metadata,
+                        1 - (kc.embedding <=> %s::vector) AS similarity
+                    FROM knowledge_chunks kc
+                    JOIN documents d
+                        ON d.id = kc.document_id
+                    WHERE kc.project_id = %s
+                    ORDER BY kc.embedding <=> %s::vector
                     LIMIT %s
                     """,
                     (
@@ -175,16 +168,19 @@ class KnowledgeRepository:
             {
                 "document_id": str(row[0]),
                 "project_id": row[1],
-                "content": row[2],
-                "chunk_index": row[3],
-                "page_number": row[4],
-                "metadata": row[5],
-                "similarity": float(row[6]),
+                "file_name": row[2],
+                "content": row[3],
+                "chunk_index": row[4],
+                "page_number": row[5],
+                "metadata": row[6],
+                "similarity": float(row[7]),
             }
             for row in rows
         ]
-        
+
     
+    
+
     def search_keyword_chunks(
         self,
         query: str,
@@ -195,43 +191,55 @@ class KnowledgeRepository:
         if not query.strip():
             raise ValueError("Search query cannot be empty.")
 
-        if not project_id:
+        if not project_id or not project_id.strip():
             raise ValueError("Project ID is required.")
 
         if limit < 1 or limit > 50:
             raise ValueError("Limit must be between 1 and 50.")
 
+        terms = re.findall(r"[a-zA-Z0-9]+", query.lower())
+
+        stop_words = {
+            "what", "are", "is", "the", "during",
+            "a", "an", "of", "should", "does"
+        }
+
+        search_query = " | ".join(
+            term for term in terms
+            if term not in stop_words
+        )
+
+        if not search_query:
+            return []
+
         with self._get_connection() as connection:
             with connection.cursor() as cursor:
-                terms = re.findall(r"[a-zA-Z0-9]+", query.lower())
 
-                stop_words = {
-                    "what", "are", "is", "the", "during",
-                    "a", "an", "of", "should", "does"
-                }
-
-                search_query = " | ".join(
-                    term for term in terms
-                    if term not in stop_words
-                )
- 
                 cursor.execute(
                     """
                     SELECT
-                        document_id,
-                        project_id,
-                        content,
-                        chunk_index,
-                        page_number,
-                        metadata,
+                        kc.document_id,
+                        kc.project_id,
+                        d.file_name,
+                        kc.content,
+                        kc.chunk_index,
+                        kc.page_number,
+                        kc.metadata,
                         ts_rank_cd(
-                            to_tsvector('simple', replace(content, '/', ' ')),
+                            to_tsvector(
+                                'simple',
+                                replace(kc.content, '/', ' ')
+                            ),
                             to_tsquery('simple', %s)
                         ) AS keyword_score
-                    FROM knowledge_chunks
-                    WHERE project_id = %s
-                    AND to_tsvector('simple', replace(content, '/', ' '))
-                        @@ to_tsquery('simple', %s)
+                    FROM knowledge_chunks kc
+                    JOIN documents d
+                        ON d.id = kc.document_id
+                    WHERE kc.project_id = %s
+                    AND to_tsvector(
+                        'simple',
+                        replace(kc.content, '/', ' ')
+                    ) @@ to_tsquery('simple', %s)
                     ORDER BY keyword_score DESC
                     LIMIT %s
                     """,
@@ -249,14 +257,16 @@ class KnowledgeRepository:
             {
                 "document_id": str(row[0]),
                 "project_id": row[1],
-                "content": row[2],
-                "chunk_index": row[3],
-                "page_number": row[4],
-                "metadata": row[5],
-                "keyword_score": float(row[6]),
+                "file_name": row[2],
+                "content": row[3],
+                "chunk_index": row[4],
+                "page_number": row[5],
+                "metadata": row[6],
+                "keyword_score": float(row[7]),
             }
             for row in rows
         ]
+
 
     def search_hybrid_chunks(
         self,
