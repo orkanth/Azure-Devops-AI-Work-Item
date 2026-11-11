@@ -214,9 +214,7 @@ class KnowledgeRepository:
                     term for term in terms
                     if term not in stop_words
                 )
-
-                print("Original query:", query)
-                print("Generated search query:", search_query)
+ 
                 cursor.execute(
                     """
                     SELECT
@@ -339,12 +337,7 @@ class KnowledgeRepository:
             combined[key]["rrf_score"] += (
                 1 / (rrf_k + rank)
             )
-
-        
-
-        print("\n--- RRF DEBUGGING ---")
-        print("RRF constant:", rrf_k)
-
+ 
         for item in combined.values():
             print(
                 f"Chunk: {item['chunk_index']}, "
