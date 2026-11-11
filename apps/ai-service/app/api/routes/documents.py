@@ -2,6 +2,9 @@
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.services.document_extractor import extract_document
+from app.schemas.document_question import DocumentQuestionRequest
+from app.services.rag_answer_service import RAGAnswerService
+
 from io import BytesIO
 from pathlib import Path
 
@@ -62,7 +65,33 @@ async def extract_uploaded_document(
         await file.close()
         
 def extract_pdf(file_content: bytes) -> dict:
+    
     if not file_content.startswith(b"%PDF-"):
         raise ValueError("Invalid PDF file content.")
 
     reader = PdfReader(BytesIO(file_content))
+
+
+@router.post("/documents/ask")
+async def ask_document_question(
+    request: DocumentQuestionRequest,
+):
+    try:
+        rag_service = RAGAnswerService()
+
+        result = await rag_service.answer_question(
+            question=request.question,
+            project_id=request.project_id,
+            limit=request.limit,
+        )
+
+        return {
+            "status": "success",
+            "data": result,
+        }
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        ) from exc
