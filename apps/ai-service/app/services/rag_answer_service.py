@@ -1,4 +1,4 @@
-
+import re
 from openai import AsyncOpenAI
 
 from app.core.config import settings
@@ -138,11 +138,44 @@ class RAGAnswerService:
             )
 
         # Step 8: Prepare source metadata for citations.
+        sources = self.extract_cited_sources(
+            answer=answer,
+            chunks=chunks,
+        )
+
+        # Step 9: Return answer and source references.
+        return {
+            "question": question,
+            "answer": answer.strip(),
+            "sources": sources,
+        }
+
+    def extract_cited_sources(
+        self,
+        answer: str,
+        chunks: list[dict],
+    ) -> list[dict]:
+
+        # Extract source numbers such as [Source 1], [Source 2].
+        cited_numbers = {
+            int(number)
+            for number in re.findall(
+                r"\[Source\s+(\d+)\]",
+                answer,
+                flags=re.IGNORECASE,
+            )
+        }
+
         sources = []
 
         for index, chunk in enumerate(chunks, start=1):
+
+            if index not in cited_numbers:
+                continue
+
             sources.append({
                 "source": index,
+                "file_name": chunk.get("file_name"),
                 "document_id": chunk["document_id"],
                 "page_number": chunk.get("page_number"),
                 "chunk_index": chunk["chunk_index"],
@@ -151,9 +184,4 @@ class RAGAnswerService:
                 "rrf_score": chunk.get("rrf_score"),
             })
 
-        # Step 9: Return answer and source references.
-        return {
-            "question": question,
-            "answer": answer.strip(),
-            "sources": sources,
-        }
+        return sources
