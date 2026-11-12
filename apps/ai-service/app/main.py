@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from app.api.routes import health, work_items, documents
 from app.core.config import settings
 from app.services.langchain_service import LangChainService
-
+from app.schemas.work_items import GenerateWorkItemsRequest
 
 # --------------------------------------------------
 # Application configuration
@@ -84,7 +84,16 @@ async def ask_langchain(request: LangChainQuestionRequest):
         "answer": answer,
     }
 
+@api_v1.post("/langchain/generate-epic")
+async def generate_epic(request: GenerateWorkItemsRequest):
+    epic = await langchain_service.generate_epic(
+        request.requirement
+    )
 
+    return {
+        "status": "success",
+        "epic": epic.model_dump(),
+    }
 # --------------------------------------------------
 # Register routers
 # --------------------------------------------------

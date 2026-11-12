@@ -8,20 +8,20 @@ from app.services.rag_retrieval_service import RAGRetrievalService
 from app.rag.context_builder import RAGContextBuilder
 
 logger = logging.getLogger(__name__)
+
+
 class RAGAnswerService:
     """
     Generates answers using retrieved document context (RAG).
     """
 
     def __init__(self):
-        self.client = AsyncOpenAI(
-            api_key=settings.openai_api_key
-        )
+        self.client = AsyncOpenAI(api_key=settings.openai_api_key)
 
         self.retrieval_service = RAGRetrievalService()
         self.context_builder = RAGContextBuilder()
 
-    async def answer_question( 
+    async def answer_question(
         self,
         question: str,
         project_id: str,
@@ -30,7 +30,7 @@ class RAGAnswerService:
         """
         Retrieve relevant document chunks and generate
         an answer grounded in the retrieved context.
-        """ 
+        """
         total_start = time.perf_counter()
         logger.info("[RAG] Starting question: %s", question)
         if not question or not question.strip():
@@ -170,8 +170,7 @@ class RAGAnswerService:
 
         if not answer:
             answer = (
-                "I couldn't generate an answer from "
-                "the available document context."
+                "I couldn't generate an answer from " "the available document context."
             )
 
         # Step 8: Prepare source metadata for citations.
@@ -184,7 +183,7 @@ class RAGAnswerService:
         logger.info(
             "[RAG] Total execution time: %.2f seconds.",
             time.perf_counter() - total_start,
-        ) 
+        )
         return {
             "question": question,
             "answer": answer.strip(),
@@ -212,15 +211,17 @@ class RAGAnswerService:
             if index not in cited_numbers:
                 continue
 
-            sources.append({
-                "source": index,
-                "file_name": chunk.get("file_name"),
-                "document_id": chunk["document_id"],
-                "page_number": chunk.get("page_number"),
-                "chunk_index": chunk["chunk_index"],
-                "semantic_rank": chunk.get("semantic_rank"),
-                "keyword_rank": chunk.get("keyword_rank"),
-                "rrf_score": chunk.get("rrf_score"),
-            })
+            sources.append(
+                {
+                    "source": index,
+                    "file_name": chunk.get("file_name"),
+                    "document_id": chunk["document_id"],
+                    "page_number": chunk.get("page_number"),
+                    "chunk_index": chunk["chunk_index"],
+                    "semantic_rank": chunk.get("semantic_rank"),
+                    "keyword_rank": chunk.get("keyword_rank"),
+                    "rrf_score": chunk.get("rrf_score"),
+                }
+            )
 
         return sources
