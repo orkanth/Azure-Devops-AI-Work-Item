@@ -7,7 +7,7 @@ from app.api.routes import health, work_items, documents
 from app.core.config import settings
 from app.services.langchain_service import LangChainService
 from app.schemas.work_items import GenerateWorkItemsRequest
-
+from app.services.nestjs_client import NestJSClient
 # --------------------------------------------------
 # Application configuration
 # --------------------------------------------------
@@ -93,6 +93,28 @@ async def generate_epic(request: GenerateWorkItemsRequest):
     return {
         "status": "success",
         "epic": epic.model_dump(),
+    }
+    
+@api_v1.post("/langchain/ask-with-tools")
+async def ask_with_tools(request: LangChainQuestionRequest):
+    answer = await langchain_service.ask_with_tools(
+        request.question
+    )
+
+    return {
+        "status": "success",
+        "answer": answer,
+    }
+    
+@api_v1.get("/test-nestjs")
+async def test_nestjs():
+    client = NestJSClient()
+    work_items = await client.get_work_items()
+
+    return {
+        "status": "success",
+        "count": len(work_items),
+        "work_items": work_items,
     }
 # --------------------------------------------------
 # Register routers

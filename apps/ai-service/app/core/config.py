@@ -27,5 +27,7 @@ class Settings(BaseSettings):
     db_password: str = ""
     db_database: str = ""
 
-
+    # NestJS API configuration
+    nestjs_api_url: str = "http://localhost:3000/api"
+    
 settings = Settings()

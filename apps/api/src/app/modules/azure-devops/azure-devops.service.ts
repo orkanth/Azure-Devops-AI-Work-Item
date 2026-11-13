@@ -51,6 +51,12 @@ interface WiqlQueryResponse {
 interface WorkItemsResponse {
   value?: AzureDevOpsWorkItem[];
 }
+export interface WorkItemFilters {
+  type?: string;
+  state?: string;
+  assignedTo?: string;
+  priority?: number;
+}
 
 export type AzureDevOpsWorkItemType =
   | 'Epic'
@@ -75,7 +81,15 @@ export class AzureDevOpsService {
   private readonly logger = new Logger(AzureDevOpsService.name);
   constructor(private readonly config: ConfigService) {}
 
-  async getWorkItems(): Promise<AzureDevOpsWorkItem[]> {
+  private escapeWiqlValue(value: string): string {
+    return value.replace(/'/g, "''");
+  }
+  async getWorkItems(
+    filters: WorkItemFilters = {},
+  ): Promise<AzureDevOpsWorkItem[]> {
+    this.validateFilterValue(filters.type, 'Work item type');
+    this.validateFilterValue(filters.state, 'State');
+    this.validateFilterValue(filters.assignedTo, 'Assigned to');
     const organization = this.getRequiredConfig('AZURE_DEVOPS_ORG');
     const project = this.getRequiredConfig('AZURE_DEVOPS_PROJECT');
     const token = this.getRequiredConfig('AZURE_DEVOPS_PAT');
@@ -99,6 +113,40 @@ export class AzureDevOpsService {
       $top: '200',
       'api-version': apiVersion,
     });
+    // Step 1: Build filter conditions.
+    const conditions: string[] = ['[System.TeamProject] = @project'];
+    if (
+      filters.priority !== undefined &&
+      ![1, 2, 3, 4].includes(filters.priority)
+    ) {
+      throw new BadRequestException('Priority must be between 1 and 4.');
+    }
+    if (filters.type) {
+      conditions.push(
+        `[System.WorkItemType] = '${this.escapeWiqlValue(filters.type)}'`,
+      );
+    }
+
+    if (filters.state) {
+      conditions.push(
+        `[System.State] = '${this.escapeWiqlValue(filters.state)}'`,
+      );
+    }
+
+    if (filters.assignedTo) {
+      conditions.push(
+        `[System.AssignedTo] = '${this.escapeWiqlValue(filters.assignedTo)}'`,
+      );
+    }
+    if (filters.priority !== undefined) {
+      if (filters.priority === 1 || filters.priority === 2) {
+        conditions.push(`[Microsoft.VSTS.Common.Priority] IN (1, 2)`);
+      } else {
+        conditions.push(
+          `[Microsoft.VSTS.Common.Priority] = ${filters.priority}`,
+        );
+      }
+    }
 
     const queryUrl = `${baseUrl}/_apis/wit/wiql?${queryParams.toString()}`;
 
@@ -111,13 +159,14 @@ export class AzureDevOpsService {
           query: `
             SELECT [System.Id]
             FROM WorkItems
-            WHERE [System.TeamProject] = @project
+            WHERE ${conditions.join(' AND ')}
             ORDER BY [System.Id] DESC
           `,
         }),
       },
     );
 
+    // conditions declared later
     const ids = [
       ...new Set(
         (queryResult.workItems ?? [])
@@ -589,5 +638,24 @@ export class AzureDevOpsService {
     return users.filter(
       (user) => user.displayName?.trim().toLowerCase() === searchName,
     );
+  }
+
+  private validateFilterValue(
+    value: string | undefined,
+    fieldName: string,
+  ): void {
+    if (value === undefined) {
+      return;
+    }
+
+    if (!value.trim()) {
+      throw new BadRequestException(`${fieldName} cannot be empty.`);
+    }
+
+    if (value.length > 200) {
+      throw new BadRequestException(
+        `${fieldName} cannot exceed 200 characters.`,
+      );
+    }
   }
 }

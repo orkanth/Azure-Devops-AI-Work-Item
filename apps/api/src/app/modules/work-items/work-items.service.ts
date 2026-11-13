@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import {
   AzureDevOpsService,
   AzureDevOpsWorkItem,
+  WorkItemFilters,
 } from '../azure-devops/azure-devops.service';
 import { CreateWorkItemDto } from './dto/create-work-item.dto';
 import { UpdateWorkItemDto } from './dto/update-work-item.dto';
@@ -28,15 +29,16 @@ export interface WorkItemResponse {
 @Injectable()
 export class WorkItemsService {
   constructor(private readonly azureDevOpsService: AzureDevOpsService) {}
+    async findAll(
+      filters: WorkItemFilters = {},
+    ): Promise<WorkItemResponse[]> {
+      const [items, displayNames] = await Promise.all([
+        this.azureDevOpsService.getWorkItems(filters),
+        this.azureDevOpsService.getUserDisplayNames(),
+      ]);
 
-  async findAll(): Promise<WorkItemResponse[]> {
-    const [items, displayNames] = await Promise.all([
-      this.azureDevOpsService.getWorkItems(),
-      this.azureDevOpsService.getUserDisplayNames(),
-    ]);
-
-    return items.map((item) => this.mapWorkItem(item, displayNames));
-  }
+      return items.map((item) => this.mapWorkItem(item, displayNames));
+    }
 
   private mapWorkItem(
     item: AzureDevOpsWorkItem,
@@ -324,6 +326,7 @@ export class WorkItemsService {
       errors,
     };
   }
+ 
 
   async findOne(id: number): Promise<WorkItemResponse> {
     const [items, displayNames] = await Promise.all([
