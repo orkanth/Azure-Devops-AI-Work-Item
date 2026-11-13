@@ -38,9 +38,24 @@ async def generate_epic(request: GenerateWorkItemsRequest):
 
 @router.post("/langchain/ask-with-tools")
 async def ask_with_tools(request: LangChainQuestionRequest):
-    answer = await langchain_service.ask_with_tools(
+    response = await langchain_service.ask_with_tools(
         request.question
     )
+
+    if isinstance(response, str):
+        answer = response
+
+    elif isinstance(response, list):
+        answer = "\n".join(
+            block["text"]
+            for block in response
+            if isinstance(block, dict)
+            and block.get("type") == "text"
+            and isinstance(block.get("text"), str)
+        )
+
+    else:
+        answer = str(response)
 
     return {
         "status": "success",

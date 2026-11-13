@@ -9,6 +9,9 @@ from datetime import datetime
 from langchain.tools import tool
 from langchain.messages import ToolMessage
 from app.services.nestjs_client import NestJSClient
+import logging
+
+logger = logging.getLogger(__name__)
 
 @tool
 def get_current_date() -> str:
@@ -30,6 +33,7 @@ async def get_work_items(
     assigned_to: str | None = None,
     priority: int | None = None,
 ) -> list[dict]:
+    
     """Retrieve Azure DevOps work items.
 
     Optional filters:
@@ -40,6 +44,7 @@ async def get_work_items(
 
     Use this tool when users ask about Azure DevOps work items.
     """
+     
     return await nestjs_client.get_work_items(
         type=type,
         state=state,
@@ -119,11 +124,15 @@ class LangChainService:
     
     async def ask_with_tools(self, question: str) -> str:
         messages = [
-            (
+           (
                 "system",
                 "You are DevFlow AI, an enterprise project management assistant. "
                 "Use available tools to retrieve real Azure DevOps information. "
-                "Never invent work item counts or details.",
+                "Never invent work item counts, details, descriptions, or assignments. "
+                "If a tool returns an error, clearly inform the user that the "
+                "operation failed. Never interpret a tool error as an empty result. "
+                "Only report counts and work item details supported by successful "
+                "tool results."
             ),
             ("human", question),
         ]
@@ -143,6 +152,7 @@ class LangChainService:
 
             messages.append(response)
 
+            
             for tool_call in response.tool_calls:
 
                 selected_tool = next(
@@ -159,22 +169,50 @@ class LangChainService:
                         f"Unknown tool: {tool_call['name']}"
                     )
 
-                tool_result = await selected_tool.ainvoke(
-                    tool_call["args"]
-                )
+                try:
+                    tool_result = await selected_tool.ainvoke(
+                        tool_call["args"]
+                    )
 
-                print("Executed tool:", selected_tool.name)
-                print("Tool result type:", type(tool_result))
+                    logger.info(
+                        "Tool executed successfully: %s",
+                        selected_tool.name,
+                    )
 
-                if isinstance(tool_result, list):
-                    print("Retrieved records:", len(tool_result))
+                except Exception:
+                    logger.exception(
+                        "Tool execution failed: %s",
+                        selected_tool.name,
+                    )
 
+                    tool_result = {
+                        "status": "error",
+                        "message": (
+                            f"The tool {selected_tool.name} "
+                            "could not complete the request. "
+                            "Do not invent or assume the missing data."
+                        ),
+                    }
+
+                if selected_tool.name == "get_work_items" and isinstance(tool_result, list):
+                    logger.info("Retrieved %s work items", len(tool_result))
+
+                    for item in tool_result:
+                        logger.debug(
+                            "Work item ID: %s, Title: %s, State: %s",
+                            item.get("id"),
+                            item.get("title"),
+                            item.get("state"),
+                        )
+
+                # IMPORTANT: Always append one output for each tool call.
                 messages.append(
                     ToolMessage(
                         content=str(tool_result),
                         tool_call_id=tool_call["id"],
                     )
                 )
+
 
         raise RuntimeError(
             "Maximum tool-calling iterations exceeded."
