@@ -22,14 +22,30 @@ def add_numbers(a: float, b: float) -> float:
 
 nestjs_client = NestJSClient()
 
-
+ 
 @tool
-async def get_work_items() -> list[dict]:
-    """Retrieve all work items from Azure DevOps, including their
-    IDs, titles, types, states, assignees, priorities and URLs.
-    Use this tool when the user asks about Azure DevOps work items.
+async def get_work_items(
+    type: str | None = None,
+    state: str | None = None,
+    assigned_to: str | None = None,
+    priority: int | None = None,
+) -> list[dict]:
+    """Retrieve Azure DevOps work items.
+
+    Optional filters:
+    - type: Work item type (Epic, Feature, User Story, Task, Bug).
+    - state: Work item state.
+    - assigned_to: Assignee email address.
+    - priority: Priority (1, 2, 3, or 4).
+
+    Use this tool when users ask about Azure DevOps work items.
     """
-    return await nestjs_client.get_work_items()
+    return await nestjs_client.get_work_items(
+        type=type,
+        state=state,
+        assigned_to=assigned_to,
+        priority=priority,
+    )
 
 class LangChainService:
 

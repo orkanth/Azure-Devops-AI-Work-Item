@@ -1,16 +1,9 @@
 
-from fastapi import APIRouter, FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 
-from app.api.routes import health, work_items, documents
 from app.core.config import settings
-from app.services.langchain_service import LangChainService
-from app.schemas.work_items import GenerateWorkItemsRequest
-from app.services.nestjs_client import NestJSClient
-# --------------------------------------------------
-# Application configuration
-# --------------------------------------------------
+from app.api.routes import health, root, work_items, documents, langchain, nestjs
 
 API_V1_PREFIX = "/api/v1"
 
@@ -19,11 +12,6 @@ app = FastAPI(
     version=settings.ai_service_version,
     description="AI-powered enterprise work item generation and orchestration",
 )
-
-
-# --------------------------------------------------
-# CORS configuration
-# --------------------------------------------------
 
 app.add_middleware(
     CORSMiddleware,
@@ -36,89 +24,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# --------------------------------------------------
-# Services
-# --------------------------------------------------
-
-langchain_service = LangChainService()
-
-
-# --------------------------------------------------
-# Request schemas
-# --------------------------------------------------
-
-class LangChainQuestionRequest(BaseModel):
-    question: str
-
-
-# --------------------------------------------------
-# Root endpoint
-# --------------------------------------------------
-
-@app.get("/")
-async def root():
-    return {
-        "message": "Welcome to DevFlow AI",
-        "service": settings.ai_service_name,
-        "version": settings.ai_service_version,
-    }
-
-
-# --------------------------------------------------
-# API v1 routes
-# --------------------------------------------------
-
-api_v1 = APIRouter(prefix=API_V1_PREFIX)
-
-api_v1.include_router(work_items.router)
-api_v1.include_router(documents.router)
-
-
-@api_v1.post("/langchain/ask")
-async def ask_langchain(request: LangChainQuestionRequest):
-    answer = await langchain_service.ask(request.question)
-
-    return {
-        "status": "success",
-        "answer": answer,
-    }
-
-@api_v1.post("/langchain/generate-epic")
-async def generate_epic(request: GenerateWorkItemsRequest):
-    epic = await langchain_service.generate_epic(
-        request.requirement
-    )
-
-    return {
-        "status": "success",
-        "epic": epic.model_dump(),
-    }
-    
-@api_v1.post("/langchain/ask-with-tools")
-async def ask_with_tools(request: LangChainQuestionRequest):
-    answer = await langchain_service.ask_with_tools(
-        request.question
-    )
-
-    return {
-        "status": "success",
-        "answer": answer,
-    }
-    
-@api_v1.get("/test-nestjs")
-async def test_nestjs():
-    client = NestJSClient()
-    work_items = await client.get_work_items()
-
-    return {
-        "status": "success",
-        "count": len(work_items),
-        "work_items": work_items,
-    }
-# --------------------------------------------------
-# Register routers
-# --------------------------------------------------
-
+app.include_router(root.router)
 app.include_router(health.router)
-app.include_router(api_v1)
+
+app.include_router(work_items.router, prefix=API_V1_PREFIX)
+app.include_router(documents.router, prefix=API_V1_PREFIX)
+app.include_router(langchain.router, prefix=API_V1_PREFIX)
+app.include_router(nestjs.router, prefix=API_V1_PREFIX)
