@@ -1,3 +1,4 @@
+
 import httpx
 
 from app.core.config import settings
@@ -6,12 +7,12 @@ from app.core.config import settings
 class NestJSClient:
 
     async def get_work_items(
-            self,
-            type: str | None = None,
-            state: str | None = None,
-            assigned_to: str | None = None,
-            priority: int | None = None,
-        ) -> list[dict]:
+        self,
+        type: str | None = None,
+        state: str | None = None,
+        assigned_to: str | None = None,
+        priority: int | None = None,
+    ) -> list[dict]:
 
         url = f"{settings.nestjs_api_url}/work-items"
 
@@ -22,7 +23,6 @@ class NestJSClient:
             "priority": priority,
         }
 
-        # Remove parameters that were not provided.
         params = {
             key: value
             for key, value in params.items()
@@ -31,12 +31,17 @@ class NestJSClient:
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(url, params=params)
-
             response.raise_for_status()
 
             return response.json()
-            response = await client.get(url)
 
+    
+    async def search_users(self, name: str) -> list[dict]:
+        url = f"{settings.nestjs_api_url}/users/search"
+
+        params = {"name": name}
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(url, params=params)
             response.raise_for_status()
-
             return response.json()

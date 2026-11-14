@@ -287,6 +287,35 @@ export class AzureDevOpsService {
     return displayNames;
   }
 
+  async searchUsers(
+    name: string,
+  ): Promise<{ displayName: string; email: string }[]> {
+    const searchTerm = name.trim().toLowerCase();
+
+    if (!searchTerm) {
+      throw new BadRequestException('User name cannot be empty.');
+    }
+
+    const users = await this.getGraphUsers();
+
+    return users
+      .map((user) => {
+        const email = (user.mailAddress || user.principalName || '').trim();
+
+        const displayName = user.displayName?.trim() || email;
+
+        return {
+          displayName,
+          email,
+        };
+      })
+      .filter(
+        (user) =>
+          user.displayName.toLowerCase().includes(searchTerm) ||
+          user.email.toLowerCase().includes(searchTerm),
+      );
+  }
+
   async createWorkItem(
     input: CreateAzureDevOpsWorkItemInput,
   ): Promise<AzureDevOpsWorkItem> {
@@ -612,7 +641,6 @@ export class AzureDevOpsService {
         '/_apis/graph/users',
     );
 
-    url.searchParams.set('subjectTypes', 'user');
     url.searchParams.set('api-version', '7.1-preview.1');
 
     const headers = {

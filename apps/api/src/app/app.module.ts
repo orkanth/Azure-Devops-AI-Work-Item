@@ -7,7 +7,8 @@ import { WorkItemsModule } from './modules/work-items/work-items.module';
 import { GenerationModule } from './modules/generation/generation.module'; 
 import { DocumentsModule } from './modules/documents/documents.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
+import { TypeOrmModule } from '@nestjs/typeorm'; 
+import { UsersModule } from './modules/users/users.module';
 @Module({
   imports: [
      ConfigModule.forRoot({
@@ -31,7 +32,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
     HealthModule,
     WorkItemsModule,
     GenerationModule,
-    DocumentsModule
+    DocumentsModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],
