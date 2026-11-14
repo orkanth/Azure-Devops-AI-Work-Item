@@ -1,5 +1,5 @@
-import { Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { IsIn, IsInt, IsOptional, IsString, MaxLength, IsBoolean } from 'class-validator'; 
 
 export class WorkItemFiltersDto {
   @IsOptional()
@@ -22,4 +22,13 @@ export class WorkItemFiltersDto {
   @IsInt()
   @IsIn([1, 2, 3, 4])
   priority?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => {
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  })
+  @IsBoolean()
+  is_assigned?: boolean;
 }

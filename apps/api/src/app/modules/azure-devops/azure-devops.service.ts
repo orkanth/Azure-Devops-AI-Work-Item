@@ -56,6 +56,7 @@ export interface WorkItemFilters {
   state?: string;
   assignedTo?: string;
   priority?: number;
+  is_assigned?: boolean;
 }
 
 export type AzureDevOpsWorkItemType =
@@ -148,6 +149,13 @@ export class AzureDevOpsService {
       }
     }
 
+    if (filters.is_assigned === true) {
+      conditions.push(`[System.AssignedTo] <> ''`);
+    }
+
+    if (filters.is_assigned === false) {
+      conditions.push(`[System.AssignedTo] = ''`);
+    }
     const queryUrl = `${baseUrl}/_apis/wit/wiql?${queryParams.toString()}`;
 
     const queryResult = await this.requestJson<WiqlQueryResponse>(

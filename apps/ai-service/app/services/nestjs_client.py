@@ -12,6 +12,7 @@ class NestJSClient:
         state: str | None = None,
         assigned_to: str | None = None,
         priority: int | None = None,
+        is_assigned: bool | None = None,
     ) -> list[dict]:
 
         url = f"{settings.nestjs_api_url}/work-items"
@@ -21,6 +22,7 @@ class NestJSClient:
             "state": state,
             "assignedTo": assigned_to,
             "priority": priority,
+            "is_assigned": is_assigned,
         }
 
         params = {

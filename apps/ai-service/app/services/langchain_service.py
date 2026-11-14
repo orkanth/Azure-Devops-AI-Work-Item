@@ -48,6 +48,7 @@ async def get_work_items(
     state: str | None = None,
     assigned_to: str | None = None,
     priority: int | None = None,
+    is_assigned: bool | None = None,
 ) -> list[dict]:
     """Retrieve Azure DevOps work items.
 
@@ -56,6 +57,8 @@ async def get_work_items(
     - state: Work item state.
     - assigned_to: Assignee email address.
     - priority: Priority (1, 2, 3, or 4).
+    - is_assigned: True for items assigned to anyone,
+      False for unassigned items.
 
     Use this tool when users ask about Azure DevOps work items.
     """
@@ -64,8 +67,8 @@ async def get_work_items(
         state=state,
         assigned_to=assigned_to,
         priority=priority,
+        is_assigned=is_assigned,
     )
-
 
 # --------------------------------------------------
 # Tool 4: Search Azure DevOps users
@@ -230,7 +233,7 @@ class LangChainService:
 
         # Detect whether the user specified a particular assignee.
         assignee_match = re.search(
-            r"\bassigned\s+to\s+(.+?)(?=\s+(?:with|and|having)\b|[?.!,]|$)",
+            r"\bassigned\s+to\s+(.+?)(?=\s+(?:with|and|having|versus|vs)\b|[?.!,]|$)",
             question_lower,
         )
 
