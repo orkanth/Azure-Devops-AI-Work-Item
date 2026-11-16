@@ -156,6 +156,13 @@ export class AzureDevOpsService {
     if (filters.is_assigned === false) {
       conditions.push(`[System.AssignedTo] = ''`);
     }
+
+    if (filters.is_assigned === false && filters.assignedTo) {
+      throw new BadRequestException(
+        'Cannot filter by a specific assignee when is_assigned is false.',
+      );
+    }
+
     const queryUrl = `${baseUrl}/_apis/wit/wiql?${queryParams.toString()}`;
 
     const queryResult = await this.requestJson<WiqlQueryResponse>(
