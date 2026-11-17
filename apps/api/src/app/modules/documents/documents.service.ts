@@ -294,8 +294,8 @@ export class DocumentsService {
   async claimNextIngestionJob(): Promise<DocumentIngestionJobEntity | null> {
     return this.dataSource.transaction(async (manager) => {
       const jobsRepository = manager.getRepository(DocumentIngestionJobEntity);
+      const documentsRepository = manager.getRepository(DocumentEntity);
 
-      // 1. Find and lock the oldest available job.
       const job = await jobsRepository
         .createQueryBuilder('job')
         .where('job.status = :status', {
@@ -307,12 +307,11 @@ export class DocumentsService {
         .setOnLocked('skip_locked')
         .getOne();
 
-      // 2. No available job.
       if (!job) {
+        console.log('No queued ingestion jobs available.');
         return null;
       }
 
-      // 3. Mark the job as processing.
       job.status = IngestionJobStatus.PROCESSING;
       job.attemptCount += 1;
       job.startedAt = new Date();
@@ -320,13 +319,19 @@ export class DocumentsService {
 
       await jobsRepository.save(job);
 
-      // 4. Return the job with its document details.
-      return jobsRepository.findOne({
+      await documentsRepository.update(
+        { id: job.documentId },
+        { status: DocumentStatus.PROCESSING },
+      );
+
+      const claimedJob = await jobsRepository.findOne({
         where: { id: job.id },
-        relations: {
-          document: true,
-        },
+        relations: { document: true },
       });
+
+      console.log('Claimed ingestion job:', claimedJob?.id);
+
+      return claimedJob;
     });
   }
 
@@ -420,8 +425,6 @@ export class DocumentsService {
       }
 
       await jobsRepository.save(job);
-      console.log('After save:', job.errorMessage);
-      // 5. Update the associated document.
       // 5. Update the associated document.
       await documentsRepository.update(
         { id: job.documentId },
@@ -501,5 +504,25 @@ export class DocumentsService {
         'Document question-answering service is currently unavailable.',
       );
     }
+  }
+
+  async getDocumentContent(documentId: string) {
+    const document = await this.documentsRepository.findOne({
+      where: { id: documentId },
+    });
+
+    if (!document) {
+      throw new NotFoundException(
+        `Document with ID ${documentId} was not found.`,
+      );
+    }
+
+    const content = await this.storageProvider.get(document.storageKey);
+
+    return {
+      content,
+      fileName: document.fileName,
+      contentType: document.contentType,
+    };
   }
 }

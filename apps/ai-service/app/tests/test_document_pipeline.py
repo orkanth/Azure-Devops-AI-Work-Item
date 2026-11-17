@@ -1,72 +1,87 @@
+from io import BytesIO
 
-from pathlib import Path
+from docx import Document
+from pypdf import PdfWriter
 
 from app.services.document_extractor import extract_document
 from app.rag.chunker import chunk_extracted_document
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+def create_test_pdf() -> bytes:
+    """Create a minimal PDF for testing."""
 
-TEST_DOCUMENTS = [
-    PROJECT_ROOT
-    / "local-data"
-    / "documents"
-    / "5e779f8f-cdf7-4395-914e-324fe4f16fc8"
-    / "0917_FrontEnd_Dev_Exp_Tjaart.pdf",
+    buffer = BytesIO()
 
-    PROJECT_ROOT
-    / "local-data"
-    / "documents"
-    / "4c7a7f76-250f-449f-9257-b27bb62b6940"
-    / "INFINITY_SPORTZ-_Concept_Note_.docx",
-]
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    writer.write(buffer)
+
+    return buffer.getvalue()
 
 
-for file_path in TEST_DOCUMENTS:
+def create_test_docx() -> bytes:
+    """Create a DOCX document for testing."""
 
-    print(f"\nProcessing: {file_path.name}")
+    buffer = BytesIO()
 
-    if not file_path.exists():
-        raise FileNotFoundError(file_path)
-
-    # Step 1: Extract document text
-    extracted_data = extract_document(
-        file_name=file_path.name,
-        file_content=file_path.read_bytes(),
+    document = Document()
+    document.add_heading("DevFlow AI Test Document", level=1)
+    document.add_paragraph(
+        "This document contains sample content for testing "
+        "document extraction and chunk generation."
     )
 
-    # Step 2: Generate metadata-aware chunks
+    document.save(buffer)
+
+    return buffer.getvalue()
+
+
+def validate_chunks(chunks: list[dict]) -> None:
+    """Validate metadata-aware document chunks."""
+
+    assert len(chunks) > 0
+
+    assert all(chunk["document_id"] == "integration-test-document" for chunk in chunks)
+
+    assert all(chunk["chunk_index"] == index for index, chunk in enumerate(chunks))
+
+    assert all(len(chunk["content"]) <= 1000 for chunk in chunks)
+
+
+def test_pdf_document_pipeline():
+
+    file_name = "sample.pdf"
+    file_content = create_test_pdf()
+
+    extracted_data = extract_document(
+        file_name=file_name,
+        file_content=file_content,
+    )
+
+    assert extracted_data["file_type"] == "pdf"
+
+    # A blank PDF contains no extractable text.
+    # Verify extraction separately without requiring chunks.
+    assert extracted_data["page_count"] == 1
+
+
+def test_docx_document_pipeline():
+
+    file_name = "sample.docx"
+    file_content = create_test_docx()
+
+    extracted_data = extract_document(
+        file_name=file_name,
+        file_content=file_content,
+    )
+
+    assert extracted_data["file_type"] == "docx"
+    assert "DevFlow AI Test Document" in extracted_data["full_text"]
+
     chunks = chunk_extracted_document(
         document_id="integration-test-document",
-        file_name=file_path.name,
+        file_name=file_name,
         extracted_data=extracted_data,
     )
 
-    # Step 3: Validate results
-    assert len(chunks) > 0
-
-    assert all(
-        chunk["document_id"] == "integration-test-document"
-        for chunk in chunks
-    )
-
-    assert all(
-        chunk["chunk_index"] == index
-        for index, chunk in enumerate(chunks)
-    )
-
-    assert all(
-        len(chunk["content"]) <= 1000
-        for chunk in chunks
-    )
-
-    print("File type:", extracted_data["file_type"])
-    print("Total chunks:", len(chunks))
-    print("First chunk length:", len(chunks[0]["content"]))
-    print("First chunk page:", chunks[0]["page_number"])
-    print("First chunk content:")
-    print(chunks[0]["content"][:200])
-
-    print("Integration test passed!")
-
-print("\nAll document pipeline tests passed!")
+    validate_chunks(chunks)

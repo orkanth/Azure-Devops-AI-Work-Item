@@ -19,6 +19,7 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_model: str = ""
     embedding_model: str = "text-embedding-3-small"
+    embedding_dimensions: int = 1536
 
     # PostgreSQL configuration
     db_host: str = "localhost"

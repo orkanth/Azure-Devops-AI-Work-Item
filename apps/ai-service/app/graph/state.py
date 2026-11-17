@@ -1,0 +1,33 @@
+from typing import Any, TypedDict
+
+
+class DevFlowState(TypedDict, total=False):
+    # User request
+    question: str
+    project_id: str
+    conversation_id: str
+
+    # Supervisor routing
+    intent: str
+    next_agent: str
+
+    # Work-item request interpretation
+    work_item_intent: str
+    filters: dict[str, Any]
+    assignee_name: str | None
+    assignee_email: str | None
+
+    # Agent execution
+    messages: list[Any]
+    tool_results: list[dict[str, Any]]
+    agent_response: str
+
+    # RAG
+    retrieved_context: str
+    sources: list[dict[str, Any]]
+
+    # Workflow status
+    status: str
+    error: str | None
+
+    clarification_options: list[dict[str, Any]]

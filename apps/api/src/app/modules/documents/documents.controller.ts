@@ -9,6 +9,10 @@ import {
   UploadedFile,
   UseInterceptors,
   Query,
+  Header,
+  StreamableFile,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -46,8 +50,10 @@ export class DocumentsController {
   }
 
   @Post('ingestion-jobs/claim')
-  claimNextIngestionJob() {
-    return this.documentsService.claimNextIngestionJob();
+  @HttpCode(HttpStatus.OK)
+  async claimNextIngestionJob() {
+    const job = await this.documentsService.claimNextIngestionJob();
+    return { job };
   }
 
   @Post('ingestion-jobs/:jobId/complete')
@@ -74,5 +80,18 @@ export class DocumentsController {
   @Post('ask')
   askQuestion(@Body() dto: AskDocumentQuestionDto) {
     return this.documentsService.askQuestion(dto);
+  }
+
+  @Get(':documentId/content')
+  @Header('Cache-Control', 'no-store')
+  async getDocumentContent(
+    @Param('documentId', ParseUUIDPipe) documentId: string,
+  ) {
+    const document = await this.documentsService.getDocumentContent(documentId);
+
+    return new StreamableFile(document.content, {
+      type: document.contentType,
+      disposition: 'attachment',
+    });
   }
 }

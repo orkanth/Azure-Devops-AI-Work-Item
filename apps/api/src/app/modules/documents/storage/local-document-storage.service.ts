@@ -1,8 +1,4 @@
-
-import {
-  BadRequestException,
-  Injectable,
-} from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 
@@ -12,9 +8,7 @@ import {
 } from './document-storage.provider';
 
 @Injectable()
-export class LocalDocumentStorageService
-  implements DocumentStorageProvider
-{
+export class LocalDocumentStorageService implements DocumentStorageProvider {
   private readonly storageRoot = path.resolve(
     process.cwd(),
     process.env.DOCUMENT_STORAGE_PATH || 'local-data',
@@ -32,9 +26,7 @@ export class LocalDocumentStorageService
       throw new BadRequestException('File content is missing.');
     }
 
-    const originalName = path.basename(
-      file.originalname.replace(/\\/g, '/'),
-    );
+    const originalName = path.basename(file.originalname.replace(/\\/g, '/'));
 
     const safeFileName = originalName
       .replace(/[^a-zA-Z0-9._-]/g, '_')
@@ -73,10 +65,7 @@ export class LocalDocumentStorageService
   }
 
   async delete(storageKey: string): Promise<void> {
-    if (
-      !storageKey.startsWith('documents/') ||
-      storageKey.includes('\\')
-    ) {
+    if (!storageKey.startsWith('documents/') || storageKey.includes('\\')) {
       throw new BadRequestException('Invalid storage key.');
     }
 
@@ -100,6 +89,37 @@ export class LocalDocumentStorageService
       if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
         throw error;
       }
+    }
+  }
+
+  async get(storageKey: string): Promise<Buffer> {
+    if (
+      !storageKey.startsWith('documents/') ||
+      storageKey.includes('\\') ||
+      storageKey
+        .split('/')
+        .some((segment) => !segment || segment === '.' || segment === '..')
+    ) {
+      throw new BadRequestException('Invalid storage key.');
+    }
+
+    const destination = path.resolve(
+      this.storageRoot,
+      ...storageKey.split('/'),
+    );
+
+    if (!destination.startsWith(`${this.storageRoot}${path.sep}`)) {
+      throw new BadRequestException('Invalid storage path.');
+    }
+
+    try {
+      return await fs.readFile(destination);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        throw new NotFoundException('Stored document was not found.');
+      }
+
+      throw error;
     }
   }
 }

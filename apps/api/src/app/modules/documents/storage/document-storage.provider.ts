@@ -13,6 +13,8 @@ export interface DocumentStorageProvider {
     file: Express.Multer.File,
   ): Promise<StoredDocument>;
 
+  get(storageKey: string): Promise<Buffer>;
+
   delete(storageKey: string): Promise<void>;
 }
 

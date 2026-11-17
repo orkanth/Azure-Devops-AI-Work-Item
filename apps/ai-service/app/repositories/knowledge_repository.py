@@ -2,10 +2,13 @@
 from uuid import UUID
 import re
 import psycopg
+import math
 from psycopg.types.json import Jsonb
 
 from app.core.config import settings
+import logging
 
+logger = logging.getLogger(__name__)
 
 class KnowledgeRepository:
 
@@ -20,12 +23,10 @@ class KnowledgeRepository:
             dbname=settings.db_database,
         )
 
+    
     def save_chunks(self, chunks: list[dict]) -> int:
         """
-        Save document chunks and embeddings in one transaction.
-
-        Existing chunks for the same document are replaced
-        only when the complete operation succeeds.
+        Replace all indexed chunks for a document atomically.
         """
 
         if not chunks:
@@ -33,83 +34,155 @@ class KnowledgeRepository:
 
         first_chunk = chunks[0]
 
-        document_id = str(UUID(first_chunk["document_id"]))
-        project_id = first_chunk["project_id"]
+        try:
+            document_id = UUID(str(first_chunk["document_id"]))
+        except (KeyError, ValueError, TypeError) as exc:
+            raise ValueError("Invalid or missing document ID.") from exc
 
-        if not project_id.strip():
+        project_id = first_chunk.get("project_id")
+
+        if not isinstance(project_id, str) or not project_id.strip():
             raise ValueError("Project ID is required.")
 
-        # Validate all chunks before opening the transaction.
+        validated_chunks = []
+
         for chunk in chunks:
-            if str(UUID(chunk["document_id"])) != document_id:
+            try:
+                chunk_document_id = UUID(str(chunk["document_id"]))
+            except (KeyError, ValueError, TypeError) as exc:
+                raise ValueError("Invalid chunk document ID.") from exc
+
+            if chunk_document_id != document_id:
                 raise ValueError("Chunks contain different document IDs.")
 
-            if chunk["project_id"] != project_id:
+            if chunk.get("project_id") != project_id:
                 raise ValueError("Chunks contain different project IDs.")
 
-            if len(chunk["embedding"]) != self.EMBEDDING_DIMENSIONS:
+            content = chunk.get("content")
+            if not isinstance(content, str):
+                raise ValueError("Chunk content must be a string.")
+
+            embedding = chunk.get("embedding")
+
+            if not isinstance(embedding, (list, tuple)):
+                raise ValueError("Chunk embedding must be a list.")
+
+            if len(embedding) != self.EMBEDDING_DIMENSIONS:
                 raise ValueError(
                     f"Expected {self.EMBEDDING_DIMENSIONS} embedding "
-                    f"dimensions, got {len(chunk['embedding'])}."
+                    f"dimensions, got {len(embedding)}."
                 )
 
+            try:
+                embedding_values = [float(value) for value in embedding]
+            except (ValueError, TypeError) as exc:
+                raise ValueError("Embedding contains invalid values.") from exc
+
+            if not all(
+                math.isfinite(value)
+                for value in embedding_values
+            ):
+                raise ValueError("Embedding contains non-finite values.")
+
+            chunk_index = chunk.get("chunk_index")
+
+            if (
+                not isinstance(chunk_index, int)
+                or isinstance(chunk_index, bool)
+                or chunk_index < 0
+            ):
+                raise ValueError("Chunk index must be a non-negative integer.")
+
+            metadata = chunk.get("metadata") or {}
+
+            if not isinstance(metadata, dict):
+                raise ValueError("Chunk metadata must be a dictionary.")
+
+            page_number = chunk.get("page_number")
+
+            validated_chunks.append({
+                "content": content,
+                "chunk_index": chunk_index,
+                "page_number": page_number,
+                "metadata": metadata,
+                "embedding": embedding_values,
+            })
+
+        # Prevent duplicate chunk indexes within the incoming batch.
+        indexes = [chunk["chunk_index"] for chunk in validated_chunks]
+
+        if len(indexes) != len(set(indexes)):
+            raise ValueError("Duplicate chunk indexes found.")
+
+        # The connection context commits on success and rolls back on error.
         with self._get_connection() as connection:
             with connection.cursor() as cursor:
 
-                # Prepare the search query
-                terms = re.findall(r"[a-zA-Z0-9]+", query.lower())
-
-                stop_words = {
-                    "what", "are", "is", "the", "during",
-                    "a", "an", "of", "should", "does"
-                }
-
-                search_query = " | ".join(
-                    term for term in terms
-                    if term not in stop_words
-                )
-
-                if not search_query:
-                    return []
-
-                # Execute SQL while cursor is available
+                # Verify document existence and project ownership.
                 cursor.execute(
                     """
-                    SELECT
-                        kc.document_id,
-                        kc.project_id,
-                        d.file_name,
-                        kc.content,
-                        kc.chunk_index,
-                        kc.page_number,
-                        kc.metadata,
-                        ts_rank_cd(
-                            to_tsvector(
-                                'simple',
-                                replace(kc.content, '/', ' ')
-                            ),
-                            to_tsquery('simple', %s)
-                        ) AS keyword_score
-                    FROM knowledge_chunks kc
-                    JOIN documents d
-                        ON d.id = kc.document_id
-                    WHERE kc.project_id = %s
-                    AND to_tsvector(
-                        'simple',
-                        replace(kc.content, '/', ' ')
-                    ) @@ to_tsquery('simple', %s)
-                    ORDER BY keyword_score DESC
-                    LIMIT %s
+                    SELECT project_id
+                    FROM documents
+                    WHERE id = %s
+                    FOR UPDATE
                     """,
-                    (
-                        search_query,
-                        project_id,
-                        search_query,
-                        limit,
-                    ),
+                    (str(document_id),),
                 )
 
-                rows = cursor.fetchall()
+                document = cursor.fetchone()
+
+                if document is None:
+                    raise ValueError("Document does not exist.")
+
+                if document[0] != project_id:
+                    raise ValueError(
+                        "Document project ID does not match chunk project ID."
+                    )
+
+                # Remove old chunks inside the same transaction.
+                cursor.execute(
+                    """
+                    DELETE FROM knowledge_chunks
+                    WHERE document_id = %s
+                    """,
+                    (str(document_id),),
+                )
+
+                # Insert replacement chunks.
+                cursor.executemany(
+                    """
+                    INSERT INTO knowledge_chunks (
+                        document_id,
+                        project_id,
+                        content,
+                        chunk_index,
+                        page_number,
+                        metadata,
+                        embedding
+                    )
+                    VALUES (
+                        %s, %s, %s, %s, %s, %s, %s::vector
+                    )
+                    """,
+                    [
+                        (
+                            str(document_id),
+                            project_id,
+                            chunk["content"],
+                            chunk["chunk_index"],
+                            chunk["page_number"],
+                            Jsonb(chunk["metadata"]),
+                            "[" + ",".join(
+                                str(value)
+                                for value in chunk["embedding"]
+                            ) + "]",
+                        )
+                        for chunk in validated_chunks
+                    ],
+                )
+
+        return len(validated_chunks)
+
     
     
     
@@ -281,7 +354,7 @@ class KnowledgeRepository:
         if not query.strip():
             raise ValueError("Search query cannot be empty.")
 
-        if not project_id:
+        if not isinstance(project_id, str) or not project_id.strip():
             raise ValueError("Project ID is required.")
 
         if limit < 1 or limit > 50:
@@ -349,11 +422,13 @@ class KnowledgeRepository:
             )
  
         for item in combined.values():
-            print(
-                f"Chunk: {item['chunk_index']}, "
-                f"Semantic rank: {item['semantic_rank']}, "
-                f"Keyword rank: {item['keyword_rank']}, "
-                f"RRF score: {item['rrf_score']:.6f}"
+            logger.debug(
+                "Chunk: %s | Semantic rank: %s | "
+                "Keyword rank: %s | RRF score: %.6f",
+                item["chunk_index"],
+                item["semantic_rank"],
+                item["keyword_rank"],
+                item["rrf_score"],
             )
         # Step 4: Sort by combined RRF score
         ranked_results = sorted(
