@@ -1,4 +1,7 @@
-from typing import Any, TypedDict
+from typing import Annotated, Any, TypedDict
+
+from langchain_core.messages import AnyMessage
+from langgraph.graph.message import add_messages
 
 
 class DevFlowState(TypedDict, total=False):
@@ -6,6 +9,9 @@ class DevFlowState(TypedDict, total=False):
     question: str
     project_id: str
     conversation_id: str
+
+    # Conversation history
+    messages: Annotated[list[AnyMessage], add_messages]
 
     # Supervisor routing
     intent: str
@@ -18,7 +24,6 @@ class DevFlowState(TypedDict, total=False):
     assignee_email: str | None
 
     # Agent execution
-    messages: list[Any]
     tool_results: list[dict[str, Any]]
     agent_response: str
 

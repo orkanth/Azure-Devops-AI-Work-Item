@@ -1,0 +1,7 @@
+from langgraph.checkpoint.memory import InMemorySaver
+
+
+def create_checkpointer():
+    """Create an in-memory LangGraph checkpointer."""
+
+    return InMemorySaver()

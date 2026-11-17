@@ -1,6 +1,6 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-
+from langchain_core.messages import AIMessage, HumanMessage
 from app.agents.supervisor.agent import (
     SupervisorAgent,
     SupervisorDecision,
@@ -118,3 +118,102 @@ async def test_rejects_empty_question(mock_llm):
 
     with pytest.raises(ValueError):
         await agent({"question": ""})
+
+
+@pytest.mark.asyncio
+async def test_supervisor_receives_previous_conversation(mock_llm):
+    llm, structured_llm = mock_llm
+
+    structured_llm.ainvoke = AsyncMock(
+        return_value=SupervisorDecision(
+            next_agent="work_items",
+            reason="The user requested Revathi's high-priority tasks.",
+        )
+    )
+
+    agent = SupervisorAgent(llm=llm)
+
+    previous_messages = [
+        HumanMessage(content="Show Ravi's tasks"),
+        AIMessage(content="Here are Ravi's tasks."),
+    ]
+
+    result = await agent(
+        {
+            "question": "Show Revathi's high-priority tasks",
+            "messages": previous_messages,
+        }
+    )
+
+    assert result["next_agent"] == "work_items"
+
+    # Inspect the messages sent to the structured LLM.
+    sent_messages = structured_llm.ainvoke.call_args.args[0]
+
+    assert len(sent_messages) == 4
+
+    assert sent_messages[1].content == "Show Ravi's tasks"
+    assert sent_messages[2].content == "Here are Ravi's tasks."
+    assert sent_messages[3].content == ("Show Revathi's high-priority tasks")
+
+
+@pytest.mark.asyncio
+async def test_supervisor_handles_new_conversation_without_history(mock_llm):
+    llm, structured_llm = mock_llm
+
+    structured_llm.ainvoke = AsyncMock(
+        return_value=SupervisorDecision(
+            next_agent="work_items",
+            reason="The user requested Revathi's tasks.",
+        )
+    )
+
+    agent = SupervisorAgent(llm=llm)
+
+    result = await agent(
+        {
+            "question": "Show Revathi's tasks",
+            "messages": [],
+        }
+    )
+
+    assert result["next_agent"] == "work_items"
+
+    sent_messages = structured_llm.ainvoke.call_args.args[0]
+
+    # System message + current user question.
+    assert len(sent_messages) == 2
+
+    assert sent_messages[1].content == "Show Revathi's tasks"
+
+
+@pytest.mark.asyncio
+async def test_supervisor_uses_current_question_with_previous_context(mock_llm):
+    llm, structured_llm = mock_llm
+
+    structured_llm.ainvoke = AsyncMock(
+        return_value=SupervisorDecision(
+            next_agent="work_items",
+            reason="The user is asking for Ravi's completed tasks.",
+        )
+    )
+
+    agent = SupervisorAgent(llm=llm)
+
+    previous_messages = [
+        HumanMessage(content="Show Ravi's tasks"),
+        AIMessage(content="Here are Ravi's tasks."),
+    ]
+
+    result = await agent(
+        {
+            "question": "Show his completed tasks",
+            "messages": previous_messages,
+        }
+    )
+
+    assert result["next_agent"] == "work_items"
+
+    sent_messages = structured_llm.ainvoke.call_args.args[0]
+
+    assert sent_messages[-1].content == "Show his completed tasks"

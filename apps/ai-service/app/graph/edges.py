@@ -12,34 +12,31 @@ AGENT_ROUTES = {
 
 def route_after_supervisor(state: dict[str, Any]) -> str:
     """
-    Select the specialist agent based on the Supervisor decision.
+    Select the next node based on the Supervisor decision.
+
+    Specialist requests go to their respective agents.
+    Clarifications, errors, and invalid routes go to response.
     """
 
     status = state.get("status")
 
-    # Do not route after an error or clarification response.
     if status in ("error", "needs_clarification"):
-        return END
+        return "response"
 
     next_agent = state.get("next_agent")
 
     if not isinstance(next_agent, str):
-        return END
+        return "response"
 
     destination = AGENT_ROUTES.get(next_agent.strip().lower())
 
     if destination is None:
-        return END
+        return "response"
 
     return destination
 
 
 def route_after_agent(state: dict[str, Any]) -> str:
-    """
-    End the workflow after a specialist agent responds.
-
-    The caller receives the result, including any errors or
-    clarification requests.
-    """
+    """End the workflow after a specialist agent responds."""
 
     return END

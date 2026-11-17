@@ -5,6 +5,7 @@ from langgraph.graph import END, StateGraph
 from app.graph.state import DevFlowState
 from app.graph.nodes import create_graph_nodes
 from app.graph.edges import route_after_supervisor
+from app.graph.checkpoint import create_checkpointer
 
 
 def build_workflow(
@@ -17,17 +18,6 @@ def build_workflow(
 ):
     """
     Build and compile the DevFlow AI LangGraph workflow.
-
-    Args:
-        supervisor_agent: Routes the user's request.
-        work_items_agent: Handles work-item operations.
-        users_agent: Handles independent user operations.
-        rag_agent: Answers questions using project documents.
-        generation_agent: Generates work-item hierarchies.
-        checkpointer: Optional LangGraph checkpoint saver.
-
-    Returns:
-        A compiled LangGraph application.
     """
 
     nodes = create_graph_nodes(
@@ -47,7 +37,7 @@ def build_workflow(
     # Every request starts with the Supervisor.
     graph.set_entry_point("supervisor")
 
-    # Route the Supervisor's decision to the selected specialist.
+    # Route the Supervisor's decision.
     graph.add_conditional_edges(
         "supervisor",
         route_after_supervisor,
@@ -56,14 +46,17 @@ def build_workflow(
             "users": "users",
             "rag": "rag",
             "generation": "generation",
-            END: END,
+            "response": "response",
         },
     )
 
-    # Specialist agents return their results to the caller.
+    # Specialist agents finish the request.
     graph.add_edge("work_items", END)
     graph.add_edge("users", END)
     graph.add_edge("rag", END)
     graph.add_edge("generation", END)
 
-    return graph.compile(checkpointer=checkpointer)
+    # Save clarification/error responses before finishing.
+    graph.add_edge("response", END)
+
+    return graph.compile(checkpointer=checkpointer or create_checkpointer())

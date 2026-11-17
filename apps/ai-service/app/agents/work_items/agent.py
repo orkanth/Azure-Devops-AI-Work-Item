@@ -1,7 +1,11 @@
 import logging
 from typing import Any, Literal
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import (
+    AnyMessage,
+    HumanMessage,
+    SystemMessage,
+)
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel
 
@@ -26,10 +30,72 @@ class WorkItemRequest(BaseModel):
 WORK_ITEM_SYSTEM_PROMPT = """
 You are an intent extraction assistant for Azure DevOps.
 
-Understand the user's natural-language request and extract
-the requested work-item information.
+Understand the user's current natural-language request and
+extract the effective work-item filters.
 
-Rules:
+CONVERSATION CONTEXT RULES:
+
+1. Use previous conversation messages to understand follow-up
+   questions, pronouns and incomplete references.
+
+2. Explicit values in the current user message always take
+   precedence over previous values.
+
+3. If the user specifies a different assignee, replace the
+   previous assignee.
+
+4. If the user specifies a different priority, state or
+   work-item type, replace the previous value.
+
+5. For a clear follow-up, resolve missing information from
+   the previous conversation.
+
+6. Preserve previous filters only when the current request
+   clearly continues or refines the previous request.
+
+7. Do not carry filters from a previous request into a
+   complete, independent new request.
+
+8. Never invent an assignee, state, priority or other filter.
+
+9. If a pronoun cannot be resolved confidently, leave the
+   assignee_name empty rather than inventing a person.
+
+10. Return the effective filters for the current request,
+    not a collection of unrelated historical filters.
+
+EXAMPLES:
+
+Example 1:
+Previous request: Show Ravi's tasks.
+Current request: Show Revathi's high-priority tasks.
+
+Result:
+- assignee_name: Revathi
+- priority: 1 (assuming the configured Azure DevOps
+  priority convention uses 1 for High)
+- Other unspecified filters: None
+
+Example 2:
+Previous request: Show Revathi's high-priority tasks.
+Current request: Show her completed tasks.
+
+Result:
+- assignee_name: Revathi
+- state: Completed
+- Preserve priority only if this is clearly a refinement
+  of the previous filtered request.
+
+Example 3:
+Previous request: Show Ravi's tasks.
+Current request: Show all active tasks.
+
+Result:
+- assignee_name: None
+- state: Active
+- Do not retain Ravi as the assignee.
+
+WORK-ITEM EXTRACTION RULES:
 
 1. Identify a specific assignee whenever a person is mentioned.
 2. Understand natural-language variations, including:
@@ -72,24 +138,42 @@ class WorkItemsAgent:
 
         self.request_llm = self.llm.with_structured_output(WorkItemRequest)
 
-    async def execute(self, question: str) -> dict[str, Any]:
-        """Interpret and execute an Azure DevOps work-item request."""
+    async def execute(
+        self,
+        question: str,
+        messages: list[AnyMessage] | None = None,
+    ) -> dict[str, Any]:
+        """Interpret and execute a work-item request using conversation history."""
 
         if not isinstance(question, str) or not question.strip():
             raise ValueError("Question cannot be empty.")
 
-        # Step 1: Understand the natural-language request.
+        conversation = messages or []
+
+        # Only include valid LangChain messages.
+        conversation = [
+            message
+            for message in conversation
+            if isinstance(message, HumanMessage)
+            or message.__class__.__name__ == "AIMessage"
+        ]
+
+        # Step 1: Understand the current request and its context.
         request = await self.request_llm.ainvoke(
             [
                 SystemMessage(content=WORK_ITEM_SYSTEM_PROMPT),
+                *conversation,
                 HumanMessage(content=question.strip()),
             ]
         )
 
         logger.info(
-            "Work-item request interpreted: intent=%s, assignee=%s",
+            "Work-item request interpreted: intent=%s, assignee=%s, "
+            "state=%s, priority=%s",
             request.intent,
             request.assignee_name,
+            request.state,
+            request.priority,
         )
 
         # Step 2: Build filters from structured LLM output.
@@ -112,7 +196,6 @@ class WorkItemsAgent:
                 {"name": request.assignee_name},
             )
 
-            # A tool error must never be treated as an empty result.
             if not isinstance(users, list):
                 return self._error_response(
                     "Azure DevOps user lookup failed. "
@@ -190,7 +273,10 @@ class WorkItemsAgent:
     async def __call__(self, state: dict[str, Any]) -> dict[str, Any]:
         """Allow this agent to be used directly as a LangGraph node."""
 
-        result = await self.execute(state["question"])
+        result = await self.execute(
+            question=state["question"],
+            messages=state.get("messages", []),
+        )
 
         status = result["status"]
 
@@ -204,7 +290,10 @@ class WorkItemsAgent:
                 response = f"Successfully retrieved {total} work items."
 
         else:
-            response = result.get("message", "Work-item request failed.")
+            response = result.get(
+                "message",
+                "Work-item request failed.",
+            )
 
         return {
             "work_item_intent": result.get("intent"),

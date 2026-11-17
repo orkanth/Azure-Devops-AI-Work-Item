@@ -1,9 +1,8 @@
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.api.routes import health, root, work_items, documents, langchain, nestjs
+from app.api.routes import health, root, work_items, documents, langchain, nestjs, chat
 
 API_V1_PREFIX = "/api/v1"
 
@@ -31,3 +30,4 @@ app.include_router(work_items.router, prefix=API_V1_PREFIX)
 app.include_router(documents.router, prefix=API_V1_PREFIX)
 app.include_router(langchain.router, prefix=API_V1_PREFIX)
 app.include_router(nestjs.router, prefix=API_V1_PREFIX)
+app.include_router(chat.router, prefix=API_V1_PREFIX)

@@ -1,7 +1,7 @@
 import logging
 from typing import Any, Literal
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AnyMessage, HumanMessage, SystemMessage
 from langchain_openai import ChatOpenAI
 from pydantic import BaseModel, Field
 
@@ -43,26 +43,33 @@ class SupervisorAgent:
 
         self.router = self.llm.with_structured_output(SupervisorDecision)
 
-    async def route(self, question: str) -> SupervisorDecision:
-        """Understand the request and select the appropriate agent."""
+    async def route(
+        self,
+        question: str,
+        messages: list[AnyMessage] | None = None,
+    ) -> SupervisorDecision:
+        """Understand the request using the conversation history."""
 
         if not isinstance(question, str) or not question.strip():
             raise ValueError("Question cannot be empty.")
 
-        decision = await self.router.ainvoke(
+        conversation = messages or []
+
+        response = await self.router.ainvoke(
             [
                 SystemMessage(content=DEVFLOW_SYSTEM_PROMPT),
+                *conversation,
                 HumanMessage(content=question.strip()),
             ]
         )
 
         logger.info(
             "Supervisor selected agent: %s | Reason: %s",
-            decision.next_agent,
-            decision.reason,
+            response.next_agent,
+            response.reason,
         )
 
-        return decision
+        return response
 
     async def __call__(
         self,
@@ -77,7 +84,10 @@ class SupervisorAgent:
             raise ValueError("Question cannot be empty.")
 
         try:
-            decision = await self.route(question)
+            decision = await self.route(
+                question=question,
+                messages=state.get("messages", []),
+            )
 
             if decision.next_agent == "clarification":
                 return {
