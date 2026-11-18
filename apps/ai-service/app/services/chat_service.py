@@ -78,11 +78,13 @@ class ChatService:
 
             return {
                 "conversation_id": conversation_id,
-                "status": result.get("status", "success"),
+                "status": result.get("status", "completed"),
                 "agent_response": result.get("agent_response", ""),
                 "intent": result.get("intent"),
                 "work_item_intent": result.get("work_item_intent"),
                 "proposal": result.get("proposal"),
+                "publish_id": result.get("publish_id"),
+                "publishing_result": result.get("publishing_result"),
                 "filters": result.get("filters", {}),
                 "tool_results": result.get("tool_results", []),
                 "sources": result.get("sources", []),

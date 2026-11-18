@@ -34,8 +34,9 @@ class DevFlowState(TypedDict, total=False):
     # Workflow status
     status: str
     error: str | None
-
     clarification_options: list[dict[str, Any]]
 
-    work_item_intent: str
+    # Generation and publishing
     proposal: dict[str, Any]
+    publish_id: str
+    publishing_result: dict[str, Any]

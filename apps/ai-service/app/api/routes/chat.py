@@ -26,6 +26,8 @@ class ChatResponse(BaseModel):
     error: str | None = None
     work_item_intent: str | None = None
     proposal: dict | None = None
+    publish_id: str | None = None
+    publishing_result: dict | None = None
 
 
 @lru_cache(maxsize=1)

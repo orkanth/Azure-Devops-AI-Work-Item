@@ -30,5 +30,8 @@ class Settings(BaseSettings):
 
     # NestJS API configuration
     nestjs_api_url: str = "http://localhost:3000/api"
-    
+    nestjs_api_key: str = ""
+    nestjs_publish_timeout: int = 120
+
+
 settings = Settings()

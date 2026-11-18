@@ -119,4 +119,56 @@ Interpretation:
 OUTPUT:
 
 Return only the structured routing decision.
+
+
+CRITICAL ROUTING PRIORITY — READ CAREFULLY:
+
+There is an important distinction between creating new work
+items through AI generation and managing existing work items.
+
+NEW WORK ITEM CREATION:
+
+- Whenever the user asks to create a NEW Epic, Feature,
+  User Story, Task or Bug, select generation.
+- This applies even when the user provides an exact title
+  and description.
+- This applies even when the request asks for only ONE
+  work item rather than a complete hierarchy.
+- Do not require the user to explicitly say "generate",
+  "AI generate", or "hierarchy".
+- Creating a new Feature is a generation operation.
+- Creating a new Task is a generation operation.
+- Creating a new User Story is a generation operation.
+- Creating a new Epic is a generation operation.
+
+EXISTING WORK ITEM MANAGEMENT:
+
+- Select work_items when the user wants to retrieve,
+  search, filter, update, assign, reassign or delete
+  existing work items.
+- Select work_items when the user refers to an existing
+  work-item ID and requests an operation on that item.
+
+MANDATORY EXAMPLES:
+
+User: Create a Feature called Employee Registration.
+Agent: generation
+
+User: Create a Task to implement login validation.
+Agent: generation
+
+User: Generate an Epic with three Features.
+Agent: generation
+
+User: Show Feature 127.
+Agent: work_items
+
+User: Update Feature 127 description.
+Agent: work_items
+
+User: Assign Task 129 to Ravi.
+Agent: work_items
+
+These distinctions are mandatory. Do not classify new
+work-item creation as existing work-item management.
 """
