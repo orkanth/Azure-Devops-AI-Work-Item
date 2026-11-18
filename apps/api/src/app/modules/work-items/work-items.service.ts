@@ -10,6 +10,10 @@ import { DeleteWorkItemDto } from './dto/delete-work-item.dto';
 import { PublishEpicDto } from './dto/publish-work-items.dto';
 import { NotFoundException } from '@nestjs/common';
 import { CreateAzureDevOpsWorkItemInput } from '../azure-devops/azure-devops.service';
+import {
+  GeneratedWorkItemDto,
+  PublishGeneratedWorkItemsDto,
+} from './dto/publish-generated-work-items.dto';
 
 export interface WorkItemResponse {
   id: number;
@@ -28,10 +32,24 @@ export interface WorkItemResponse {
 
 @Injectable()
 export class WorkItemsService {
+  private readonly allowedChildren: Record<string, string[]> = {
+    Epic: ['Feature', 'User Story', 'Task', 'Bug'],
+    Feature: ['User Story', 'Task', 'Bug'],
+    'User Story': ['Task', 'Bug'],
+    Task: [],
+    Bug: [],
+  };
+
+  private readonly allowedParents: Record<string, string[]> = {
+    Epic: [],
+    Feature: ['Epic'],
+    'User Story': ['Epic', 'Feature'],
+    Task: ['Epic', 'Feature', 'User Story'],
+    Bug: ['Epic', 'Feature', 'User Story'],
+  };
+
   constructor(private readonly azureDevOpsService: AzureDevOpsService) {}
-  async findAll(
-    filters: WorkItemFilters = {},
-  ): Promise<WorkItemResponse[]> {
+  async findAll(filters: WorkItemFilters = {}): Promise<WorkItemResponse[]> {
     const [items, displayNames] = await Promise.all([
       this.azureDevOpsService.getWorkItems(filters),
       this.azureDevOpsService.getUserDisplayNames(),
@@ -131,6 +149,7 @@ export class WorkItemsService {
   private getString(value: unknown, fallback: string): string {
     return typeof value === 'string' && value.length > 0 ? value : fallback;
   }
+
   async create(dto: CreateWorkItemDto): Promise<WorkItemResponse> {
     const createdItem = await this.azureDevOpsService.createWorkItem(dto);
 
@@ -326,7 +345,6 @@ export class WorkItemsService {
       errors,
     };
   }
- 
 
   async findOne(id: number): Promise<WorkItemResponse> {
     const [items, displayNames] = await Promise.all([
@@ -341,5 +359,304 @@ export class WorkItemsService {
     }
 
     return this.mapWorkItem(item, displayNames);
+  }
+
+  private validateGeneratedHierarchy(
+    item: GeneratedWorkItemDto,
+    expectedParentType?: string,
+  ): void {
+    if (
+      expectedParentType &&
+      !this.allowedChildren[expectedParentType]?.includes(item.type)
+    ) {
+      throw new BadRequestException(
+        `${item.type} cannot be created under ${expectedParentType}.`,
+      );
+    }
+
+    for (const child of item.children ?? []) {
+      this.validateGeneratedHierarchy(child, item.type);
+    }
+  }
+
+  private async resolveGeneratedParent(
+    reference?: string | null,
+  ): Promise<AzureDevOpsWorkItem | undefined> {
+    if (!reference?.trim()) {
+      return undefined;
+    }
+
+    const value = reference.trim();
+
+    let matches: AzureDevOpsWorkItem[];
+
+    if (value.startsWith('#')) {
+      const id = Number(value.slice(1));
+
+      if (!Number.isInteger(id) || id <= 0) {
+        throw new BadRequestException('Invalid parent work item ID.');
+      }
+
+      const item = await this.azureDevOpsService.getWorkItemById(id);
+      matches = item ? [item] : [];
+    } else {
+      matches = await this.azureDevOpsService.findWorkItemsByTitle(value);
+    }
+
+    if (matches.length === 0) {
+      throw new NotFoundException(
+        `Parent work item "${value}" was not found in the configured project.`,
+      );
+    }
+
+    if (matches.length > 1) {
+      throw new BadRequestException(
+        `Multiple work items match "${value}". Please specify the parent by ID.`,
+      );
+    }
+
+    const parent = matches[0];
+
+    if (!parent) {
+      throw new NotFoundException(`Parent work item "${value}" was not found.`);
+    }
+
+    this.validateWorkItemProject(parent);
+
+    return parent;
+  }
+
+  async publishGenerated(dto: PublishGeneratedWorkItemsDto) {
+    if (!dto.items.every((item) => item.type === dto.requested_type)) {
+      throw new BadRequestException(
+        'Every root item must match the requested work-item type.',
+      );
+    }
+
+    // Validate the complete hierarchy before creating anything.
+    for (const item of dto.items) {
+      this.validateGeneratedHierarchy(item);
+
+      if (dto.parent_reference && !this.allowedParents[item.type]?.length) {
+        throw new BadRequestException(
+          `${item.type} cannot have a parent work item.`,
+        );
+      }
+    }
+
+    const parent = await this.resolveGeneratedParent(dto.parent_reference);
+
+    if (parent) {
+      const parentType = String(parent.fields['System.WorkItemType'] ?? '');
+
+      for (const item of dto.items) {
+        if (!this.allowedParents[item.type]?.includes(parentType)) {
+          throw new BadRequestException(
+            `${item.type} cannot be created under ${parentType}.`,
+          );
+        }
+      }
+    }
+
+    const publishTag = `DevFlowPublish-${dto.publishId}`;
+
+    const created: Array<{
+      id: number;
+      type: string;
+      title: string;
+      parentId?: number;
+      url: string;
+    }> = [];
+
+    const reused: Array<{
+      id: number;
+      type: string;
+      title: string;
+    }> = [];
+
+    const errors: Array<{
+      type: string;
+      title: string;
+      message: string;
+    }> = [];
+
+    const createRecursively = async (
+      item: GeneratedWorkItemDto,
+      parentId: number | undefined,
+      itemTag: string,
+    ): Promise<number | null> => {
+      try {
+        // Check whether this item was already created.
+        const existingIds = await this.azureDevOpsService.findWorkItemIdsByTag(
+          itemTag,
+          item.type,
+        );
+
+        const existingId = existingIds[0];
+
+        if (existingId !== undefined) {
+          const existingItem =
+            await this.azureDevOpsService.getWorkItemById(existingId);
+
+          if (!existingItem) {
+            throw new NotFoundException(
+              `Existing work item ${existingId} was not found.`,
+            );
+          }
+
+          this.validateWorkItemProject(existingItem);
+          if (!existingItem) {
+            throw new NotFoundException(
+              `Previously published work item #${existingId} was not found.`,
+            );
+          }
+
+          // Validate that the existing item matches the proposal.
+          const existingType = String(
+            existingItem.fields['System.WorkItemType'] ?? '',
+          );
+
+          const existingTitle = String(
+            existingItem.fields['System.Title'] ?? '',
+          );
+
+          if (existingType !== item.type || existingTitle !== item.title) {
+            throw new BadRequestException(
+              `Existing work item #${existingId} does not match the publishing proposal.`,
+            );
+          }
+
+          // Validate its parent relationship.
+          const actualParentId = this.getParentIdFromWorkItem(existingItem);
+
+          if (actualParentId !== parentId) {
+            throw new BadRequestException(
+              `Existing work item #${existingId} has a different parent relationship.`,
+            );
+          }
+
+          reused.push({
+            id: existingId,
+            type: item.type,
+            title: item.title,
+          });
+
+          // IMPORTANT: Process children even when the parent already exists.
+          await Promise.all(
+            (item.children ?? []).map((child, index) =>
+              createRecursively(child, existingId, `${itemTag}-Child-${index}`),
+            ),
+          );
+
+          return existingId;
+        }
+
+        // Create the current work item.
+        const createdItem = await this.azureDevOpsService.createWorkItem({
+          type: item.type,
+          title: item.title,
+          description: item.description,
+          acceptanceCriteria: item.acceptance_criteria?.join('\n'),
+          ...(parentId !== undefined ? { parentId } : {}),
+          tags: itemTag,
+        });
+
+        created.push({
+          id: createdItem.id,
+          type: item.type,
+          title: item.title,
+          ...(parentId !== undefined ? { parentId } : {}),
+          url: createdItem.url,
+        });
+
+        // Create children under the newly created parent.
+        await Promise.all(
+          (item.children ?? []).map((child, index) =>
+            createRecursively(
+              child,
+              createdItem.id,
+              `${itemTag}-Child-${index}`,
+            ),
+          ),
+        );
+        return createdItem.id;
+      } catch (error: unknown) {
+        errors.push({
+          type: item.type,
+          title: item.title,
+          message:
+            error instanceof Error
+              ? error.message
+              : 'Unknown Azure DevOps error',
+        });
+
+        return null;
+      }
+    };
+    // Publish independent root items concurrently.
+    await Promise.all(
+      dto.items.map((item, index) =>
+        createRecursively(item, parent?.id, `${publishTag}-Item-${index}`),
+      ),
+    );
+
+    // Determine the publishing result.
+    const success = errors.length === 0;
+
+    return {
+      success,
+      status: success
+        ? 'completed'
+        : created.length > 0 || reused.length > 0
+          ? 'partial'
+          : 'failed',
+      message: success
+        ? 'All work items were published successfully to Azure DevOps.'
+        : 'Publishing completed with errors. Review the results.',
+      requestedType: dto.requested_type,
+      created,
+      reused,
+      errors,
+      summary: {
+        created: created.length,
+        reused: reused.length,
+        failed: errors.length,
+      },
+    };
+  }
+
+  private getParentIdFromWorkItem(
+    item: AzureDevOpsWorkItem,
+  ): number | undefined {
+    const relation = item.relations?.find(
+      (relation) => relation.rel === 'System.LinkTypes.Hierarchy-Reverse',
+    );
+
+    if (!relation) {
+      return undefined;
+    }
+
+    const segments = new URL(relation.url).pathname.split('/');
+    const id = Number(segments[segments.length - 1]);
+
+    return Number.isInteger(id) && id > 0 ? id : undefined;
+  }
+
+  private validateWorkItemProject(workItem: AzureDevOpsWorkItem): void {
+    const configuredProject = this.azureDevOpsService.getConfiguredProject();
+
+    const actualProject: unknown = workItem.fields?.['System.TeamProject'];
+
+    if (typeof actualProject !== 'string' || !actualProject.trim()) {
+      throw new BadRequestException(
+        'Unable to validate the work item project.',
+      );
+    }
+
+    if (actualProject.toLowerCase() !== configuredProject.toLowerCase()) {
+      throw new BadRequestException(
+        `Work item ${workItem.id} does not belong to the configured project.`,
+      );
+    }
   }
 }

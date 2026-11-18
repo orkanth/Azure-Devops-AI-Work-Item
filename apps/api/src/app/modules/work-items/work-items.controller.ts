@@ -15,13 +15,14 @@ import { UpdateWorkItemDto } from './dto/update-work-item.dto';
 import { AssignWorkItemDto } from './dto/assign-work-item.dto';
 import { DeleteWorkItemDto } from './dto/delete-work-item.dto';
 import { WorkItemsService } from './work-items.service';
-import { PublishEpicDto } from './dto/publish-work-items.dto'; 
+import { PublishEpicDto } from './dto/publish-work-items.dto';
 import { WorkItemFiltersDto } from './dto/work-item-filters.dto';
+import { PublishGeneratedWorkItemsDto } from './dto/publish-generated-work-items.dto';
 
 @Controller('work-items')
 export class WorkItemsController {
   constructor(private readonly workItemsService: WorkItemsService) {}
- 
+
   @Get()
   findAll(@Query() filters: WorkItemFiltersDto) {
     return this.workItemsService.findAll(filters);
@@ -62,5 +63,9 @@ export class WorkItemsController {
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.workItemsService.findOne(Number(id));
+  }
+  @Post('publish-generated')
+  publishGenerated(@Body() dto: PublishGeneratedWorkItemsDto) {
+    return this.workItemsService.publishGenerated(dto);
   }
 }

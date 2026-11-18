@@ -536,39 +536,44 @@ export class AzureDevOpsService {
     });
   }
 
-  private async getWorkItemsByIds(
-    ids: number[],
-    baseUrl: string,
-    headers: Record<string, string>,
-    apiVersion: string,
-  ): Promise<AzureDevOpsWorkItem[]> {
-    if (ids.length === 0) {
-      return [];
-    }
-
-    const params = new URLSearchParams({
-      ids: ids.join(','),
-      $expand: 'relations',
-      'api-version': apiVersion,
-    });
-
-    const url = `${baseUrl}/_apis/wit/workitems?${params.toString()}`;
-
-    const response = await this.requestJson<WorkItemsResponse>(url, headers, {
-      method: 'GET',
-    });
-
-    return response.value ?? [];
+ 
+private async getWorkItemsByIds(
+  ids: number[],
+  baseUrl: string,
+  headers: Record<string, string>,
+  apiVersion: string,
+): Promise<AzureDevOpsWorkItem[]> {
+  if (ids.length === 0) {
+    return [];
   }
-  private getParentId(item: AzureDevOpsWorkItem): number | undefined {
-    const parentRelation = item.relations?.find(
-      (relation) => relation.rel === 'System.LinkTypes.Hierarchy-Reverse',
-    );
 
-    const match = parentRelation?.url.match(/\/workItems\/(\d+)\/?$/i);
+  const params = new URLSearchParams({
+    ids: ids.join(','),
+    fields: [
+      'System.Id',
+      'System.Title',
+      'System.WorkItemType',
+      'System.TeamProject',
+      'System.State',
+      'System.AssignedTo',
+      'System.Description',
+      'Microsoft.VSTS.Common.AcceptanceCriteria',
+    ].join(','),
+    $expand: 'relations',
+    'api-version': apiVersion,
+  });
 
-    return match?.[1] ? Number(match[1]) : undefined;
-  }
+  const url = `${baseUrl}/_apis/wit/workitems?${params.toString()}`;
+
+  const response = await this.requestJson<WorkItemsResponse>(
+    url,
+    headers,
+    { method: 'GET' },
+  );
+
+  return response.value ?? [];
+}
+ 
 
   private escapeWiql(value: string): string {
     return value.replace(/'/g, "''");
@@ -700,5 +705,111 @@ export class AzureDevOpsService {
         `${fieldName} cannot exceed 200 characters.`,
       );
     }
+  }
+
+  async getWorkItemById(id: number): Promise<AzureDevOpsWorkItem | null> {
+    if (!Number.isInteger(id) || id <= 0) {
+      throw new BadRequestException('Invalid work item ID.');
+    }
+
+    const organization = this.getRequiredConfig('AZURE_DEVOPS_ORG');
+    const project = this.getRequiredConfig('AZURE_DEVOPS_PROJECT');
+    const token = this.getRequiredConfig('AZURE_DEVOPS_PAT');
+
+    const apiVersion =
+      this.config.get<string>('AZURE_DEVOPS_API_VERSION') || '7.1';
+
+    const baseUrl =
+      `https://dev.azure.com/${encodeURIComponent(organization)}` +
+      `/${encodeURIComponent(project)}`;
+
+    const url =
+      `${baseUrl}/_apis/wit/workitems/${id}?` +
+      new URLSearchParams({
+        $expand: 'relations',
+        'api-version': apiVersion,
+      }).toString();
+
+    const headers = {
+      Authorization: `Basic ${Buffer.from(`:${token}`).toString('base64')}`,
+      Accept: 'application/json',
+    };
+
+    try {
+      const item = await this.requestJson<AzureDevOpsWorkItem>(url, headers, {
+        method: 'GET',
+      });
+
+      console.log('Azure DevOps project:', item.fields?.['System.TeamProject']);
+
+      return item;
+    } catch (error) {
+      if (
+        error instanceof BadGatewayException &&
+        error.message.includes('HTTP 404')
+      ) {
+        return null;
+      }
+
+      throw error;
+    }
+  }
+
+  async findWorkItemsByTitle(title: string): Promise<AzureDevOpsWorkItem[]> {
+    const searchTitle = title.trim();
+
+    if (!searchTitle) {
+      throw new BadRequestException('Parent title cannot be empty.');
+    }
+
+    const organization = this.getRequiredConfig('AZURE_DEVOPS_ORG');
+    const project = this.getRequiredConfig('AZURE_DEVOPS_PROJECT');
+    const token = this.getRequiredConfig('AZURE_DEVOPS_PAT');
+
+    const apiVersion =
+      this.config.get<string>('AZURE_DEVOPS_API_VERSION') || '7.1';
+
+    const baseUrl =
+      `https://dev.azure.com/${encodeURIComponent(organization)}` +
+      `/${encodeURIComponent(project)}`;
+
+    const headers = {
+      Authorization: `Basic ${Buffer.from(`:${token}`).toString('base64')}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    };
+
+    const wiql = `
+    SELECT [System.Id]
+    FROM WorkItems
+    WHERE [System.TeamProject] = @project
+      AND [System.Title] = '${this.escapeWiql(searchTitle)}'
+    ORDER BY [System.Id] DESC
+  `;
+
+    const queryUrl =
+      `${baseUrl}/_apis/wit/wiql?` +
+      new URLSearchParams({
+        'api-version': apiVersion,
+      }).toString();
+
+    const result = await this.requestJson<WiqlQueryResponse>(
+      queryUrl,
+      headers,
+      {
+        method: 'POST',
+        body: JSON.stringify({ query: wiql }),
+      },
+    );
+
+    const ids = (result.workItems ?? [])
+      .map((item) => item.id)
+      .filter((id) => Number.isInteger(id) && id > 0);
+
+    return this.getWorkItemsByIds(ids, baseUrl, headers, apiVersion);
+  }
+
+  getConfiguredProject(): string {
+    return this.getRequiredConfig('AZURE_DEVOPS_PROJECT');
   }
 }

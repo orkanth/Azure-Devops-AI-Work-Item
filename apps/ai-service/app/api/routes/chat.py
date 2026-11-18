@@ -24,6 +24,8 @@ class ChatResponse(BaseModel):
     sources: list = Field(default_factory=list)
     clarification_options: list = Field(default_factory=list)
     error: str | None = None
+    work_item_intent: str | None = None
+    proposal: dict | None = None
 
 
 @lru_cache(maxsize=1)

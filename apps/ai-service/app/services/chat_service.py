@@ -7,6 +7,7 @@ from app.agents.work_items.agent import WorkItemsAgent
 from app.agents.users.agent import UsersAgent
 from app.agents.rag.agent import RAGAgent
 from app.graph.workflow import build_workflow
+from app.agents.generation.agent import GenerationAgent
 
 logger = logging.getLogger(__name__)
 
@@ -21,9 +22,7 @@ class ChatService:
         self.work_items_agent = WorkItemsAgent()
         self.users_agent = UsersAgent()
         self.rag_agent = RAGAgent()
-
-        # GenerationAgent will be added when implemented.
-        self.generation_agent = None
+        self.generation_agent = GenerationAgent()
 
         self.workflow = build_workflow(
             supervisor_agent=self.supervisor_agent,
@@ -82,6 +81,8 @@ class ChatService:
                 "status": result.get("status", "success"),
                 "agent_response": result.get("agent_response", ""),
                 "intent": result.get("intent"),
+                "work_item_intent": result.get("work_item_intent"),
+                "proposal": result.get("proposal"),
                 "filters": result.get("filters", {}),
                 "tool_results": result.get("tool_results", []),
                 "sources": result.get("sources", []),

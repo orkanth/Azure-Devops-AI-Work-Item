@@ -36,3 +36,6 @@ class DevFlowState(TypedDict, total=False):
     error: str | None
 
     clarification_options: list[dict[str, Any]]
+
+    work_item_intent: str
+    proposal: dict[str, Any]
