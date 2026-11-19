@@ -18,13 +18,22 @@ logger = logging.getLogger(__name__)
 class WorkItemRequest(BaseModel):
     """Structured interpretation of a work-item request."""
 
-    intent: Literal["list", "count", "search", "other"]
+    intent: Literal[
+        "list",
+        "count",
+        "search",
+        "get_by_id",
+        "assign",
+        "other",
+    ]
 
     assignee_name: str | None = None
+    assignee_email: str | None = None
     work_item_type: str | None = None
     state: str | None = None
     priority: int | None = None
     is_assigned: bool | None = None
+    work_item_id: int | None = None
 
 
 WORK_ITEM_SYSTEM_PROMPT = """
@@ -95,6 +104,60 @@ Result:
 - state: Active
 - Do not retain Ravi as the assignee.
 
+WORK ITEM ID EXTRACTION:
+
+1. If the user asks to show, view, retrieve or get
+   a specific work item by ID, use intent "get_by_id".
+
+2. Extract the numeric ID into work_item_id.
+
+3. Examples:
+   - "Show item #153"
+     intent: get_by_id
+     work_item_id: 153
+
+   - "Get details of work item 120"
+     intent: get_by_id
+     work_item_id: 120
+
+4. Do not use list or search when the user requests
+   one specific work item by ID.
+
+5. If the user requests a specific item but its ID
+   is missing or unclear, do not invent an ID.
+   
+   
+WORK ITEM ASSIGNMENT:
+
+1. If the user asks to assign or reassign a work item,
+   use intent "assign".
+
+2. Extract the numeric work item ID into work_item_id.
+
+3. If the target user is specified by display name,
+   extract it into assignee_name.
+
+4. If the target user is specified by email address,
+   extract it into assignee_email.
+
+5. Examples:
+
+   "Assign item #153 to Ravi"
+   - intent: assign
+   - work_item_id: 153
+   - assignee_name: Ravi
+
+   "Assign #153 to koundeep@gmail.com"
+   - intent: assign
+   - work_item_id: 153
+   - assignee_email: koundeep@gmail.com
+
+6. Never invent an ID or assignee.
+
+7. If the work item ID or assignee is missing,
+   request clarification.
+   
+   
 WORK-ITEM EXTRACTION RULES:
 
 1. Identify a specific assignee whenever a person is mentioned.
@@ -129,14 +192,22 @@ class WorkItemsAgent:
 
         self.get_users_tool = self.tool_map.get("get_users")
         self.get_work_items_tool = self.tool_map.get("get_work_items")
+        self.get_work_item_by_id_tool = self.tool_map.get("get_work_item_by_id")
+        self.assign_work_item_tool = self.tool_map.get("assign_work_item")
+        self.update_work_item_tool = self.tool_map.get("update_work_item")
+        self.request_llm = self.llm.with_structured_output(WorkItemRequest)
 
         if self.get_users_tool is None:
             raise ValueError("get_users tool is not registered.")
 
+        if self.get_work_item_by_id_tool is None:
+            raise ValueError("get_work_item_by_id tool is not registered.")
+
         if self.get_work_items_tool is None:
             raise ValueError("get_work_items tool is not registered.")
 
-        self.request_llm = self.llm.with_structured_output(WorkItemRequest)
+        if self.assign_work_item_tool is None:
+            raise ValueError("assign_work_item tool is not registered.")
 
     async def execute(
         self,
@@ -176,6 +247,113 @@ class WorkItemsAgent:
             request.priority,
         )
 
+        # Handle retrieval of one specific work item.
+        if request.intent == "get_by_id":
+
+            if request.work_item_id is None or request.work_item_id <= 0:
+                return {
+                    "status": "needs_clarification",
+                    "message": "Please provide a valid work item ID.",
+                }
+
+            item = await self._execute_tool(
+                self.get_work_item_by_id_tool,
+                {"work_item_id": request.work_item_id},
+            )
+
+            if not isinstance(item, dict) or item.get("status") == "error":
+                return self._error_response(
+                    "Unable to retrieve the requested work item."
+                )
+
+            return {
+                "status": "success",
+                "intent": "get_by_id",
+                "work_item_id": request.work_item_id,
+                "total": 1,
+                "work_items": [item],
+            }
+
+            # Handle work-item assignment.
+        if request.intent == "assign":
+
+            if not request.work_item_id or request.work_item_id <= 0:
+                return {
+                    "status": "needs_clarification",
+                    "message": "Which work item should I assign?",
+                }
+
+            if not request.assignee_name and not request.assignee_email:
+                return {
+                    "status": "needs_clarification",
+                    "message": "Who should I assign this work item to?",
+                }
+
+            # Step 1: Resolve and verify the Azure DevOps user.
+            assignee = await self._resolve_assignee(
+                assignee_name=request.assignee_name,
+                assignee_email=request.assignee_email,
+            )
+
+            if assignee["status"] != "success":
+                return assignee
+
+            verified_email = assignee["assignee_email"]
+
+            # Step 2: Execute the assignment.
+            assignment_result = await self._execute_tool(
+                self.assign_work_item_tool,
+                {
+                    "work_item_id": request.work_item_id,
+                    "assigned_to": verified_email,
+                },
+            )
+
+            if (
+                not isinstance(assignment_result, dict)
+                or assignment_result.get("status") == "error"
+            ):
+                return self._error_response(
+                    f"Failed to assign work item #{request.work_item_id}."
+                )
+
+            # Step 3: Retrieve the item again to verify the assignment.
+            updated_item = await self._execute_tool(
+                self.get_work_item_by_id_tool,
+                {"work_item_id": request.work_item_id},
+            )
+
+            if not isinstance(updated_item, dict):
+                return self._error_response(
+                    "Assignment was submitted, but verification failed."
+                )
+
+            actual_email = (
+                updated_item.get("assignedToEmail")
+                or updated_item.get("assignedTo")
+                or ""
+            )
+
+            if actual_email.strip().casefold() != verified_email.casefold():
+                return self._error_response(
+                    "Assignment could not be verified. "
+                    "Please check the work item in Azure DevOps."
+                )
+
+            return {
+                "status": "success",
+                "intent": "assign",
+                "work_item_id": request.work_item_id,
+                "assignee_name": assignee["assignee_name"],
+                "assignee_email": verified_email,
+                "total": 1,
+                "work_items": [updated_item],
+                "message": (
+                    f"Successfully assigned work item "
+                    f"#{request.work_item_id} to "
+                    f"{assignee['assignee_name']}."
+                ),
+            }
         # Step 2: Build filters from structured LLM output.
         filters = {
             "type": request.work_item_type,
@@ -270,6 +448,82 @@ class WorkItemsAgent:
             "assignee_name": request.assignee_name,
         }
 
+    async def _resolve_assignee(
+        self,
+        assignee_name: str | None = None,
+        assignee_email: str | None = None,
+    ) -> dict[str, Any]:
+
+        identifier = assignee_email or assignee_name
+
+        if not identifier:
+            return {
+                "status": "needs_clarification",
+                "message": "Please specify the assignee name or email.",
+            }
+
+        users = await self._execute_tool(
+            self.get_users_tool,
+            {"name": identifier},
+        )
+
+        if not isinstance(users, list):
+            return self._error_response("Azure DevOps user lookup failed.")
+
+        if not users:
+            return {
+                "status": "not_found",
+                "message": f"No Azure DevOps user matched '{identifier}'.",
+            }
+
+        if assignee_email:
+            users = [
+                user
+                for user in users
+                if (user.get("email") or "").strip().casefold()
+                == assignee_email.strip().casefold()
+            ]
+
+            if not users:
+                return {
+                    "status": "not_found",
+                    "message": f"No Azure DevOps account verified for '{assignee_email}'.",
+                }
+
+        if len(users) > 1:
+            return {
+                "status": "needs_clarification",
+                "message": "Multiple Azure DevOps users matched. Please select an account.",
+                "users": [
+                    {
+                        "display_name": (
+                            user.get("displayName")
+                            or user.get("display_name")
+                            or user.get("name")
+                        ),
+                        "email": user.get("email"),
+                    }
+                    for user in users
+                ],
+            }
+
+        email = users[0].get("email")
+
+        if not isinstance(email, str) or not email.strip():
+            return self._error_response(
+                "The selected Azure DevOps account has no valid email."
+            )
+
+        return {
+            "status": "success",
+            "assignee_name": (
+                users[0].get("displayName")
+                or users[0].get("display_name")
+                or users[0].get("name")
+            ),
+            "assignee_email": email.strip(),
+        }
+
     async def __call__(self, state: dict[str, Any]) -> dict[str, Any]:
         """Allow this agent to be used directly as a LangGraph node."""
 
@@ -286,6 +540,13 @@ class WorkItemsAgent:
 
             if intent == "count":
                 response = f"Found {total} matching work items."
+
+            elif intent == "assign":
+                response = result.get(
+                    "message",
+                    "Work item assignment completed.",
+                )
+
             else:
                 response = f"Successfully retrieved {total} work items."
 

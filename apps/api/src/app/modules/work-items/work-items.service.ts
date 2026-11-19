@@ -347,12 +347,10 @@ export class WorkItemsService {
   }
 
   async findOne(id: number): Promise<WorkItemResponse> {
-    const [items, displayNames] = await Promise.all([
-      this.azureDevOpsService.getWorkItems(),
+    const [item, displayNames] = await Promise.all([
+      this.azureDevOpsService.getWorkItemById(id),
       this.azureDevOpsService.getUserDisplayNames(),
     ]);
-
-    const item = items.find((workItem) => workItem.id === id);
 
     if (!item) {
       throw new NotFoundException(`Work item ${id} not found`);
@@ -505,7 +503,6 @@ export class WorkItemsService {
           }
 
           this.validateWorkItemProject(existingItem);
-         
 
           // Validate that the existing item matches the proposal.
           const existingType = String(

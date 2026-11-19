@@ -1,10 +1,24 @@
-
 import httpx
 
 from app.core.config import settings
 
 
 class NestJSClient:
+
+    async def assign_work_item(
+        self,
+        work_item_id: int,
+        assigned_to: str,
+    ) -> dict:
+        url = f"{settings.nestjs_api_url}/work-items/" f"{work_item_id}/assignment"
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.patch(
+                url,
+                json={"assignedTo": assigned_to},
+            )
+            response.raise_for_status()
+            return response.json()
 
     async def get_work_items(
         self,
@@ -25,11 +39,7 @@ class NestJSClient:
             "is_assigned": is_assigned,
         }
 
-        params = {
-            key: value
-            for key, value in params.items()
-            if value is not None
-        }
+        params = {key: value for key, value in params.items() if value is not None}
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.get(url, params=params)
@@ -37,7 +47,44 @@ class NestJSClient:
 
             return response.json()
 
-    
+    async def get_work_item_by_id(self, work_item_id: int) -> dict:
+        url = f"{settings.nestjs_api_url}/work-items/{work_item_id}"
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            return response.json()
+
+        async def assign_work_item(
+            self,
+            work_item_id: int,
+            assigned_to: str,
+        ) -> dict:
+            url = f"{settings.nestjs_api_url}/work-items/" f"{work_item_id}/assignment"
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.patch(
+                url,
+                json={"assignedTo": assigned_to},
+            )
+            response.raise_for_status()
+            return response.json()
+
+    async def update_work_item(
+        self,
+        work_item_id: int,
+        updates: dict,
+    ) -> dict:
+        url = f"{settings.nestjs_api_url}/work-items/" f"{work_item_id}"
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.patch(
+                url,
+                json=updates,
+            )
+            response.raise_for_status()
+            return response.json()
+
     async def search_users(self, name: str) -> list[dict]:
         url = f"{settings.nestjs_api_url}/users/search"
 
@@ -47,9 +94,7 @@ class NestJSClient:
             response = await client.get(url, params=params)
             response.raise_for_status()
             return response.json()
-        
-        
-    
+
     async def claim_ingestion_job(self) -> dict | None:
         url = f"{settings.nestjs_api_url}/documents/ingestion-jobs/claim"
 
@@ -71,12 +116,8 @@ class NestJSClient:
 
         return response.json()
 
-
     async def get_document_content(self, document_id: str) -> bytes:
-        url = (
-            f"{settings.nestjs_api_url}/documents/"
-            f"{document_id}/content"
-        )
+        url = f"{settings.nestjs_api_url}/documents/" f"{document_id}/content"
 
         async with httpx.AsyncClient(timeout=60.0) as client:
             response = await client.get(url)
@@ -85,8 +126,7 @@ class NestJSClient:
 
     async def complete_ingestion_job(self, job_id: str) -> dict:
         url = (
-            f"{settings.nestjs_api_url}/documents/"
-            f"ingestion-jobs/{job_id}/complete"
+            f"{settings.nestjs_api_url}/documents/" f"ingestion-jobs/{job_id}/complete"
         )
 
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -99,10 +139,7 @@ class NestJSClient:
         job_id: str,
         error_message: str,
     ) -> dict:
-        url = (
-            f"{settings.nestjs_api_url}/documents/"
-            f"ingestion-jobs/{job_id}/fail"
-        )
+        url = f"{settings.nestjs_api_url}/documents/" f"ingestion-jobs/{job_id}/fail"
 
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
@@ -111,5 +148,6 @@ class NestJSClient:
             )
             response.raise_for_status()
             return response.json()
+
 
 nestjs_client = NestJSClient()
