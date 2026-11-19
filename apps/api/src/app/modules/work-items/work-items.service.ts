@@ -505,11 +505,7 @@ export class WorkItemsService {
           }
 
           this.validateWorkItemProject(existingItem);
-          if (!existingItem) {
-            throw new NotFoundException(
-              `Previously published work item #${existingId} was not found.`,
-            );
-          }
+         
 
           // Validate that the existing item matches the proposal.
           const existingType = String(
