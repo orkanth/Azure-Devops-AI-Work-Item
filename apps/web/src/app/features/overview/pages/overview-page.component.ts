@@ -5,10 +5,7 @@ import { WorkspaceNavigationService } from '../../../core/services/workspace-nav
 import { WorkItemTableComponent } from '../../../shared/components/work-item-table/work-item-table.component';
 import {
   PromptProposal,
-  WorkItem,
-  WorkItemPriority,
-  WorkItemState,
-  WorkItemType,
+  WorkItem, 
 } from '../../../shared/models/work-item.model';
 import { WORK_ITEM_STORE } from '../../work-items/data-access/work-item-store';
 import { OverviewStatsComponent } from '../components/overview-stats/overview-stats.component';
@@ -17,8 +14,7 @@ import { BoardGenerationService } from '../../generator/data-access/board-genera
 import { GeneratedBoardStore } from '../../work-items/data-access/generated-board.store';
 import { firstValueFrom } from 'rxjs';
 import {
-  ApiService,
-  PublishWorkItemsResponse,
+  ApiService, 
 } from '../../../core/services/api.service';
 
 import { ChatService } from '../data-access/chat.service';
@@ -36,8 +32,7 @@ import { ChatResponse } from '../models/chat.model';
   styleUrl: './overview-page.component.css',
 })
 export class OverviewPageComponent {
-  private readonly workItemStore = inject(WORK_ITEM_STORE);
-  private readonly promptService = inject(PromptCommandService);
+  private readonly workItemStore = inject(WORK_ITEM_STORE); 
   private readonly feedback = inject(AppFeedbackService);
   private readonly navigation = inject(WorkspaceNavigationService);
   private readonly boardGenerationService = inject(BoardGenerationService);
@@ -126,50 +121,8 @@ export class OverviewPageComponent {
     } finally {
       this.isChatLoading.set(false);
     }
-  }
-  private isBoardGenerationRequest(prompt: string): boolean {
-    return (
-      /\b(generate|build|create|design|develop)\b.*\b(board|work item hierarchy|epic|epics|features|user stories)\b/i.test(
-        prompt,
-      ) ||
-      /\b(generate|build|create|design|develop)\b.*\b(system|application|platform|solution)\b/i.test(
-        prompt,
-      )
-    );
-  }
-
-  private async generateBoard(prompt: string): Promise<void> {
-    this.isGeneratingBoard.set(true);
-    this.generationSuccess.set(null);
-    this.generationError.set(null);
-
-    try {
-      // 1. Generate hierarchy using FastAPI
-      const response = await this.boardGenerationService.generateBoard({
-        requirement: prompt,
-      });
-
-      if (!response.epic) {
-        throw new Error('No Epic was returned by the AI service.');
-      }
-
-      // 2. Store generated hierarchy and publishId
-      this.generatedBoardStore.setGeneratedBoard(response.epic);
-
-      // 3. Automatically publish to Azure DevOps
-      await this.publishGeneratedBoard();
-
-      this.promptText = '';
-    } catch (error) {
-      console.error('Board generation failed:', error);
-
-      this.generationError.set(
-        'Generation or publishing failed. Please check the operation and try again.',
-      );
-    } finally {
-      this.isGeneratingBoard.set(false);
-    }
-  }
+  } 
+ 
 
   selectCandidate(item: WorkItem): void {
     const proposal = this.pendingProposal;
