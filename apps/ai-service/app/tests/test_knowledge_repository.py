@@ -1,4 +1,3 @@
-
 import pytest
 
 from unittest.mock import MagicMock, patch
@@ -66,7 +65,6 @@ def test_save_chunks_rejects_duplicate_chunk_indexes(
         repository.save_chunks(valid_chunks)
 
 
-
 def test_save_chunks_replaces_existing_chunks(
     repository,
     valid_chunks,
@@ -89,16 +87,14 @@ def test_save_chunks_replaces_existing_chunks(
 
     assert result == 1
 
-    executed_queries = [
-        call.args[0]
-        for call in mock_cursor.execute.call_args_list
-    ]
+    executed_queries = [call.args[0] for call in mock_cursor.execute.call_args_list]
 
     assert any("SELECT project_id" in query for query in executed_queries)
     assert any("DELETE FROM knowledge_chunks" in query for query in executed_queries)
 
     mock_cursor.executemany.assert_called_once()
     mock_connection.commit.assert_not_called()
+
 
 def test_save_chunks_rolls_back_when_insert_fails(
     repository,
@@ -107,9 +103,7 @@ def test_save_chunks_rolls_back_when_insert_fails(
     mock_cursor = MagicMock()
     mock_cursor.fetchone.return_value = ("project-123",)
 
-    mock_cursor.executemany.side_effect = Exception(
-        "Database insertion failed"
-    )
+    mock_cursor.executemany.side_effect = Exception("Database insertion failed")
 
     mock_connection = MagicMock()
     mock_connection.cursor.return_value.__enter__.return_value = mock_cursor
@@ -127,8 +121,8 @@ def test_save_chunks_rolls_back_when_insert_fails(
 
     connection_context.__exit__.assert_called_once()
     assert connection_context.__exit__.call_args.args[0] is not None
-    
-    
+
+
 def test_search_hybrid_chunks_combines_semantic_and_keyword_results(repository):
     semantic_results = [
         {
@@ -186,9 +180,8 @@ def test_search_hybrid_chunks_combines_semantic_and_keyword_results(repository):
     assert results[0]["semantic_rank"] == 2
     assert results[0]["keyword_rank"] == 1
 
-    assert results[0]["rrf_score"] == (
-        1 / (60 + 2) + 1 / (60 + 1)
-    )
+    assert results[0]["rrf_score"] == (1 / (60 + 2) + 1 / (60 + 1))
+
 
 def test_search_similar_chunks_rejects_invalid_embedding(repository):
     with pytest.raises(ValueError, match="embedding dimensions"):
@@ -205,7 +198,7 @@ def test_search_similar_chunks_rejects_invalid_limit(repository):
             project_id="project-123",
             limit=0,
         )
-        
+
 
 def test_search_keyword_chunks_maps_database_results(repository):
     from uuid import UUID
@@ -301,3 +294,157 @@ def test_search_similar_chunks_maps_database_results(repository):
     assert results[0]["similarity"] == 0.92
 
     mock_cursor.execute.assert_called_once()
+
+
+from uuid import UUID
+
+
+def test_resolve_document_id_by_exact_filename(repository):
+    document_id = UUID("5e779f8f-cdf7-4395-914e-000000000001")
+
+    mock_cursor = MagicMock()
+    mock_cursor.fetchall.return_value = [(document_id, "requirements.docx", "indexed")]
+
+    mock_connection = MagicMock()
+    mock_connection.cursor.return_value.__enter__.return_value = mock_cursor
+
+    connection_context = MagicMock()
+    connection_context.__enter__.return_value = mock_connection
+
+    with patch.object(
+        repository,
+        "_get_connection",
+        return_value=connection_context,
+    ):
+        result = repository.resolve_document_id(
+            project_id="project-123",
+            document_reference="requirements.docx",
+        )
+
+    assert result == str(document_id)
+
+    query, params = mock_cursor.execute.call_args.args
+
+    assert "WHERE project_id = %s" in query
+    assert params == ("project-123", None, "requirements.docx")
+
+
+def test_resolve_document_id_by_uuid(repository):
+    document_id = UUID("5e779f8f-cdf7-4395-914e-000000000001")
+
+    mock_cursor = MagicMock()
+    mock_cursor.fetchall.return_value = [(document_id, "requirements.docx", "indexed")]
+
+    mock_connection = MagicMock()
+    mock_connection.cursor.return_value.__enter__.return_value = mock_cursor
+
+    connection_context = MagicMock()
+    connection_context.__enter__.return_value = mock_connection
+
+    with patch.object(
+        repository,
+        "_get_connection",
+        return_value=connection_context,
+    ):
+        result = repository.resolve_document_id(
+            project_id="project-123",
+            document_reference=str(document_id),
+        )
+
+    assert result == str(document_id)
+
+    _, params = mock_cursor.execute.call_args.args
+
+    assert params == (
+        "project-123",
+        str(document_id),
+        str(document_id),
+    )
+
+
+def test_resolve_document_id_rejects_document_not_in_project(repository):
+    mock_cursor = MagicMock()
+    mock_cursor.fetchall.return_value = []
+
+    mock_connection = MagicMock()
+    mock_connection.cursor.return_value.__enter__.return_value = mock_cursor
+
+    connection_context = MagicMock()
+    connection_context.__enter__.return_value = mock_connection
+
+    with patch.object(
+        repository,
+        "_get_connection",
+        return_value=connection_context,
+    ):
+        with pytest.raises(ValueError, match="was not found"):
+            repository.resolve_document_id(
+                project_id="project-123",
+                document_reference="requirements.docx",
+            )
+
+
+def test_search_similar_chunks_filters_by_document_id(repository):
+    document_id = "5e779f8f-cdf7-4395-914e-000000000001"
+
+    mock_cursor = MagicMock()
+    mock_cursor.fetchall.return_value = []
+
+    mock_connection = MagicMock()
+    mock_connection.cursor.return_value.__enter__.return_value = mock_cursor
+
+    connection_context = MagicMock()
+    connection_context.__enter__.return_value = mock_connection
+
+    with patch.object(
+        repository,
+        "_get_connection",
+        return_value=connection_context,
+    ):
+        results = repository.search_similar_chunks(
+            query_embedding=[0.1] * 1536,
+            project_id="project-123",
+            limit=5,
+            document_id=document_id,
+        )
+
+    query, params = mock_cursor.execute.call_args.args
+
+    assert "AND kc.document_id = %s" in query
+    assert params[1] == "project-123"
+    assert params[2] == document_id
+    assert params[-1] == 5
+    assert results == []
+
+
+def test_search_keyword_chunks_filters_by_document_id(repository):
+    document_id = "5e779f8f-cdf7-4395-914e-000000000001"
+
+    mock_cursor = MagicMock()
+    mock_cursor.fetchall.return_value = []
+
+    mock_connection = MagicMock()
+    mock_connection.cursor.return_value.__enter__.return_value = mock_cursor
+
+    connection_context = MagicMock()
+    connection_context.__enter__.return_value = mock_connection
+
+    with patch.object(
+        repository,
+        "_get_connection",
+        return_value=connection_context,
+    ):
+        results = repository.search_keyword_chunks(
+            query="user registration",
+            project_id="project-123",
+            limit=5,
+            document_id=document_id,
+        )
+
+    query, params = mock_cursor.execute.call_args.args
+
+    assert "AND kc.document_id = %s" in query
+    assert params[1] == "project-123"
+    assert params[3] == document_id
+    assert params[-1] == 5
+    assert results == []

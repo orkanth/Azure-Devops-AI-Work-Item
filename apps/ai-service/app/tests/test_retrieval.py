@@ -1,4 +1,3 @@
-
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -9,9 +8,7 @@ from app.rag.retrieval import RAGRetrievalService
 @pytest.fixture
 def service():
     embedding_service = MagicMock()
-    embedding_service.embed_text = AsyncMock(
-        return_value=[0.1] * 1536
-    )
+    embedding_service.embed_text = AsyncMock(return_value=[0.1] * 1536)
 
     repository = MagicMock()
     repository.search_hybrid_chunks.return_value = [
@@ -26,8 +23,7 @@ def service():
 
     context_builder = MagicMock()
     context_builder.build_context.return_value = (
-        "Document: Requirement.pdf\n"
-        "Content: The developer builds AI applications."
+        "Document: Requirement.pdf\n" "Content: The developer builds AI applications."
     )
 
     return RAGRetrievalService(
@@ -74,6 +70,7 @@ async def test_retrieve_uses_project_scoped_hybrid_search(service):
         [0.1] * 1536,
         "AzureDevOpsAI",
         5,
+        document_id=None,
     )
 
 

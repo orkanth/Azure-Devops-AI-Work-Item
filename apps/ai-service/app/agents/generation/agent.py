@@ -19,6 +19,8 @@ from app.services.nestjs_publishing_service import (
 )
 from uuid import uuid4
 
+from app.rag.retrieval import RAGRetrievalService
+
 logger = logging.getLogger(__name__)
 
 
@@ -28,6 +30,7 @@ class GenerationAgent:
         self,
         llm=None,
         publishing_service: NestJSPublishingService | None = None,
+        rag_retrieval_service: RAGRetrievalService | None = None,
     ):
         self.llm = llm or ChatOpenAI(
             model=settings.openai_model,
@@ -39,10 +42,13 @@ class GenerationAgent:
 
         self.publishing_service = publishing_service or NestJSPublishingService()
 
+        self.rag_retrieval_service = rag_retrieval_service or RAGRetrievalService()
+
     async def execute(
         self,
         question: str,
         messages: list[AnyMessage] | None = None,
+        project_id: str | None = None,
     ) -> dict[str, Any]:
 
         if not question or not question.strip():
@@ -62,11 +68,73 @@ class GenerationAgent:
             "Generation intent identified: %s",
             intent.requested_type,
         )
+        # Step 2: Retrieve project documents only when explicitly requested.
+        retrieved_context = None
+        sources = []
 
-        # Step 2: Generate the structured proposal.
+        if intent.use_project_documents:
+
+            if not project_id:
+                return {
+                    "intent": "generation",
+                    "status": "failed",
+                    "error": "Project ID is required for document-based generation.",
+                    "agent_response": (
+                        "I need a project ID to retrieve the project documents."
+                    ),
+                    "sources": [],
+                }
+
+            try:
+                retrieval_result = await self.rag_retrieval_service.retrieve(
+                    query=intent.requirement,
+                    project_id=project_id,
+                    document_reference=intent.document_reference,
+                )
+
+                if not retrieval_result["chunks"]:
+                    return {
+                        "intent": "generation",
+                        "status": "failed",
+                        "error": "No relevant document content was found.",
+                        "agent_response": (
+                            "I couldn't find relevant indexed content in the "
+                            "selected project documents. No work items were published."
+                        ),
+                        "sources": [],
+                    }
+
+                retrieved_context = retrieval_result["context"]
+
+                sources = [
+                    {
+                        "document_id": chunk["document_id"],
+                        "file_name": chunk["file_name"],
+                        "page_number": chunk["page_number"],
+                        "chunk_index": chunk["chunk_index"],
+                    }
+                    for chunk in retrieval_result["chunks"]
+                ]
+
+            except ValueError as exc:
+                logger.warning("Document retrieval failed: %s", exc)
+
+                return {
+                    "intent": "generation",
+                    "status": "failed",
+                    "error": str(exc),
+                    "agent_response": (
+                        f"I couldn't retrieve the requested document: {exc} "
+                        "No work items were published."
+                    ),
+                    "sources": [],
+                }
+
+        # Step 3: Generate the structured proposal.
         proposal = await generate_work_item_hierarchy(
             requirement=intent.requirement,
             work_item_type=intent.requested_type,
+            retrieved_context=retrieved_context,
         )
 
         proposal_data = proposal.model_dump(mode="json")
@@ -136,18 +204,21 @@ class GenerationAgent:
             "publish_id": publish_id,
             "publishing_result": publishing_result,
             "status": status,
+            "sources": sources,
             "error": (
                 None if status == "completed" else publishing_result.get("message")
             ),
             "agent_response": agent_response,
         }
 
-    async def __call__(
-        self,
-        state: dict[str, Any],
-    ) -> dict[str, Any]:
 
-        return await self.execute(
-            question=state.get("question", ""),
-            messages=state.get("messages", []),
-        )
+async def __call__(
+    self,
+    state: dict[str, Any],
+) -> dict[str, Any]:
+
+    return await self.execute(
+        question=state.get("question", ""),
+        messages=state.get("messages", []),
+        project_id=state.get("project_id"),
+    )

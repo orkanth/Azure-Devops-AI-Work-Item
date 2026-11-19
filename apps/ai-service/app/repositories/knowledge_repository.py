@@ -1,4 +1,3 @@
-
 from uuid import UUID
 import re
 import psycopg
@@ -9,6 +8,7 @@ from app.core.config import settings
 import logging
 
 logger = logging.getLogger(__name__)
+
 
 class KnowledgeRepository:
 
@@ -23,7 +23,6 @@ class KnowledgeRepository:
             dbname=settings.db_database,
         )
 
-    
     def save_chunks(self, chunks: list[dict]) -> int:
         """
         Replace all indexed chunks for a document atomically.
@@ -78,10 +77,7 @@ class KnowledgeRepository:
             except (ValueError, TypeError) as exc:
                 raise ValueError("Embedding contains invalid values.") from exc
 
-            if not all(
-                math.isfinite(value)
-                for value in embedding_values
-            ):
+            if not all(math.isfinite(value) for value in embedding_values):
                 raise ValueError("Embedding contains non-finite values.")
 
             chunk_index = chunk.get("chunk_index")
@@ -100,13 +96,15 @@ class KnowledgeRepository:
 
             page_number = chunk.get("page_number")
 
-            validated_chunks.append({
-                "content": content,
-                "chunk_index": chunk_index,
-                "page_number": page_number,
-                "metadata": metadata,
-                "embedding": embedding_values,
-            })
+            validated_chunks.append(
+                {
+                    "content": content,
+                    "chunk_index": chunk_index,
+                    "page_number": page_number,
+                    "metadata": metadata,
+                    "embedding": embedding_values,
+                }
+            )
 
         # Prevent duplicate chunk indexes within the incoming batch.
         indexes = [chunk["chunk_index"] for chunk in validated_chunks]
@@ -172,10 +170,9 @@ class KnowledgeRepository:
                             chunk["chunk_index"],
                             chunk["page_number"],
                             Jsonb(chunk["metadata"]),
-                            "[" + ",".join(
-                                str(value)
-                                for value in chunk["embedding"]
-                            ) + "]",
+                            "["
+                            + ",".join(str(value) for value in chunk["embedding"])
+                            + "]",
                         )
                         for chunk in validated_chunks
                     ],
@@ -183,14 +180,70 @@ class KnowledgeRepository:
 
         return len(validated_chunks)
 
-    
-    
-    
+    def resolve_document_id(
+        self,
+        project_id: str,
+        document_reference: str,
+    ) -> str:
+        """Resolve an exact document UUID or filename within a project."""
+
+        if not project_id or not project_id.strip():
+            raise ValueError("Project ID is required.")
+
+        if not document_reference or not document_reference.strip():
+            raise ValueError("Document reference is required.")
+
+        reference = document_reference.strip()
+
+        try:
+            document_uuid = str(UUID(reference))
+        except ValueError:
+            document_uuid = None
+
+        with self._get_connection() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    SELECT id, file_name, status
+                    FROM documents
+                    WHERE project_id = %s
+                      AND (
+                          id = %s::uuid
+                          OR LOWER(file_name) = LOWER(%s)
+                      )
+                    """,
+                    (project_id, document_uuid, reference),
+                )
+
+                documents = cursor.fetchall()
+
+        if not documents:
+            raise ValueError(
+                f"Document '{reference}' was not found in project '{project_id}'."
+            )
+
+        if len(documents) > 1:
+            raise ValueError(
+                f"Multiple documents match '{reference}'. "
+                "Please specify the document ID."
+            )
+
+        document_id, file_name, status = documents[0]
+
+        if status != "indexed":
+            raise ValueError(
+                f"Document '{file_name}' is not indexed yet. "
+                f"Current status: {status}."
+            )
+
+        return str(document_id)
+
     def search_similar_chunks(
         self,
         query_embedding: list[float],
         project_id: str,
         limit: int = 5,
+        document_id: str | None = None,
     ) -> list[dict]:
 
         if len(query_embedding) != self.EMBEDDING_DIMENSIONS:
@@ -202,15 +255,18 @@ class KnowledgeRepository:
         if limit < 1 or limit > 50:
             raise ValueError("Limit must be between 1 and 50.")
 
-        embedding = "[" + ",".join(
-            str(float(value)) for value in query_embedding
-        ) + "]"
+        if document_id is not None:
+            try:
+                document_id = str(UUID(document_id))
+            except (ValueError, TypeError) as exc:
+                raise ValueError("Invalid document ID.") from exc
+
+        embedding = "[" + ",".join(str(float(value)) for value in query_embedding) + "]"
 
         with self._get_connection() as connection:
             with connection.cursor() as cursor:
 
-                cursor.execute(
-                    """
+                query = """
                     SELECT
                         kc.document_id,
                         kc.project_id,
@@ -224,16 +280,22 @@ class KnowledgeRepository:
                     JOIN documents d
                         ON d.id = kc.document_id
                     WHERE kc.project_id = %s
+                """
+
+                params = [embedding, project_id]
+
+                if document_id is not None:
+                    query += " AND kc.document_id = %s"
+                    params.append(document_id)
+
+                query += """
                     ORDER BY kc.embedding <=> %s::vector
                     LIMIT %s
-                    """,
-                    (
-                        embedding,
-                        project_id,
-                        embedding,
-                        limit,
-                    ),
-                )
+                """
+
+                params.extend([embedding, limit])
+
+                cursor.execute(query, params)
 
                 rows = cursor.fetchall()
 
@@ -251,14 +313,12 @@ class KnowledgeRepository:
             for row in rows
         ]
 
-    
-    
-
     def search_keyword_chunks(
         self,
         query: str,
         project_id: str,
         limit: int = 5,
+        document_id: str | None = None,
     ) -> list[dict]:
 
         if not query.strip():
@@ -269,18 +329,28 @@ class KnowledgeRepository:
 
         if limit < 1 or limit > 50:
             raise ValueError("Limit must be between 1 and 50.")
+        if document_id is not None:
+            try:
+                document_id = str(UUID(document_id))
+            except (ValueError, TypeError) as exc:
+                raise ValueError("Invalid document ID.") from exc
 
         terms = re.findall(r"[a-zA-Z0-9]+", query.lower())
 
         stop_words = {
-            "what", "are", "is", "the", "during",
-            "a", "an", "of", "should", "does"
+            "what",
+            "are",
+            "is",
+            "the",
+            "during",
+            "a",
+            "an",
+            "of",
+            "should",
+            "does",
         }
 
-        search_query = " | ".join(
-            term for term in terms
-            if term not in stop_words
-        )
+        search_query = " | ".join(term for term in terms if term not in stop_words)
 
         if not search_query:
             return []
@@ -288,8 +358,7 @@ class KnowledgeRepository:
         with self._get_connection() as connection:
             with connection.cursor() as cursor:
 
-                cursor.execute(
-                    """
+                sql = """
                     SELECT
                         kc.document_id,
                         kc.project_id,
@@ -313,16 +382,22 @@ class KnowledgeRepository:
                         'simple',
                         replace(kc.content, '/', ' ')
                     ) @@ to_tsquery('simple', %s)
+                """
+
+                params = [search_query, project_id, search_query]
+
+                if document_id is not None:
+                    sql += " AND kc.document_id = %s"
+                    params.append(document_id)
+
+                sql += """
                     ORDER BY keyword_score DESC
                     LIMIT %s
-                    """,
-                    (
-                        search_query,
-                        project_id,
-                        search_query,
-                        limit,
-                    ),
-                )
+                """
+
+                params.append(limit)
+
+                cursor.execute(sql, params)
 
                 rows = cursor.fetchall()
 
@@ -340,7 +415,6 @@ class KnowledgeRepository:
             for row in rows
         ]
 
-
     def search_hybrid_chunks(
         self,
         query: str,
@@ -349,6 +423,7 @@ class KnowledgeRepository:
         limit: int = 5,
         candidate_limit: int = 20,
         rrf_k: int = 60,
+        document_id: str | None = None,
     ) -> list[dict]:
 
         if not query.strip():
@@ -361,9 +436,7 @@ class KnowledgeRepository:
             raise ValueError("Limit must be between 1 and 50.")
 
         if candidate_limit < limit or candidate_limit > 100:
-            raise ValueError(
-                "Candidate limit must be between limit and 100."
-            )
+            raise ValueError("Candidate limit must be between limit and 100.")
 
         if rrf_k < 1:
             raise ValueError("RRF constant must be positive.")
@@ -373,6 +446,7 @@ class KnowledgeRepository:
             query_embedding=query_embedding,
             project_id=project_id,
             limit=candidate_limit,
+            document_id=document_id,
         )
 
         # Step 2: Run keyword search
@@ -380,6 +454,7 @@ class KnowledgeRepository:
             query=query,
             project_id=project_id,
             limit=candidate_limit,
+            document_id=document_id,
         )
 
         # Step 3: Merge results using document and chunk identity
@@ -417,14 +492,11 @@ class KnowledgeRepository:
             else:
                 combined[key]["keyword_rank"] = rank
 
-            combined[key]["rrf_score"] += (
-                1 / (rrf_k + rank)
-            )
- 
+            combined[key]["rrf_score"] += 1 / (rrf_k + rank)
+
         for item in combined.values():
             logger.debug(
-                "Chunk: %s | Semantic rank: %s | "
-                "Keyword rank: %s | RRF score: %.6f",
+                "Chunk: %s | Semantic rank: %s | " "Keyword rank: %s | RRF score: %.6f",
                 item["chunk_index"],
                 item["semantic_rank"],
                 item["keyword_rank"],
@@ -438,5 +510,3 @@ class KnowledgeRepository:
         )
 
         return ranked_results[:limit]
-
-

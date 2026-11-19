@@ -1,4 +1,3 @@
-
 import asyncio
 
 from app.rag.embeddings import EmbeddingService
@@ -16,9 +15,7 @@ class RAGRetrievalService:
         context_builder: RAGContextBuilder | None = None,
     ):
         self.embedding_service = embedding_service or EmbeddingService()
-        self.knowledge_repository = (
-            knowledge_repository or KnowledgeRepository()
-        )
+        self.knowledge_repository = knowledge_repository or KnowledgeRepository()
         self.context_builder = context_builder or RAGContextBuilder()
 
     async def retrieve(
@@ -26,8 +23,9 @@ class RAGRetrievalService:
         query: str,
         project_id: str,
         limit: int = 5,
+        document_reference: str | None = None,
     ) -> dict:
-        """Retrieve relevant chunks and build LLM-ready context."""
+        """Retrieve relevant chunks from project or a specific document."""
 
         if not isinstance(query, str) or not query.strip():
             raise ValueError("Query cannot be empty.")
@@ -41,24 +39,42 @@ class RAGRetrievalService:
         query = query.strip()
         project_id = project_id.strip()
 
-        # 1. Generate the question embedding.
+        # 1. Resolve an explicitly selected document.
+        document_id = None
+
+        if document_reference is not None:
+            if (
+                not isinstance(document_reference, str)
+                or not document_reference.strip()
+            ):
+                raise ValueError("Document reference cannot be empty.")
+
+            document_id = await asyncio.to_thread(
+                self.knowledge_repository.resolve_document_id,
+                project_id,
+                document_reference.strip(),
+            )
+
+        # 2. Generate the question embedding.
         query_embedding = await self.embedding_service.embed_text(query)
 
-        # 2. Execute hybrid search without blocking the event loop.
+        # 3. Execute hybrid search without blocking the event loop.
         chunks = await asyncio.to_thread(
             self.knowledge_repository.search_hybrid_chunks,
             query,
             query_embedding,
             project_id,
             limit,
+            document_id=document_id,
         )
 
-        # 3. Build context for the LLM.
+        # 4. Build context for the LLM.
         context = self.context_builder.build_context(chunks)
 
         return {
             "query": query,
             "project_id": project_id,
+            "document_id": document_id,
             "total_results": len(chunks),
             "chunks": chunks,
             "context": context,

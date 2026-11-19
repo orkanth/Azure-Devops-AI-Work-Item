@@ -96,3 +96,20 @@ class GenerationIntent(BaseModel):
         min_length=10,
         description="The actual business or technical requirement.",
     )
+
+    use_project_documents: bool = Field(
+        default=False,
+        description=(
+            "True when the user explicitly wants work items "
+            "generated from uploaded project documents or "
+            "the project knowledge base."
+        ),
+    )
+    document_reference: str | None = Field(
+        default=None,
+        description=(
+            "The exact filename or document UUID explicitly "
+            "mentioned by the user. None when no specific "
+            "document is requested."
+        ),
+    )
