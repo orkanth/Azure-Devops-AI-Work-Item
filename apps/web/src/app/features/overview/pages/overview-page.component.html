@@ -22,51 +22,111 @@
 </section>
 
 <app-overview-stats [stats]="stats()"></app-overview-stats>
-@if (generationSuccess(); as message) {
-  <div class="generation-notice" role="status" aria-live="polite">
-    <i class="pi pi-check-circle" aria-hidden="true"></i>
-
-    <span>{{ message }}</span>
-
-    <button
-      type="button"
-      (click)="generationSuccess.set(null)"
-      aria-label="Dismiss notification"
-    >
-      <i class="pi pi-times" aria-hidden="true"></i>
-    </button>
-  </div>
- 
-}
-
-@if (generationError()) {
-  <div class="generation-notice generation-notice-error" role="alert">
-    <i class="pi pi-exclamation-circle" aria-hidden="true"></i>
-    <span>{{ generationError() }}</span>
-    <button
-      type="button"
-      class="notice-close"
-      (click)="generationError.set(null)"
-      aria-label="Dismiss notification"
-    >
-      <i class="pi pi-times" aria-hidden="true"></i>
-    </button>
-  </div>
-}
-@if (isGeneratingBoard()) {
+@if (isChatLoading()) {
   <div class="ai-processing" role="status" aria-live="polite">
     <i class="pi pi-spin pi-spinner"></i>
-
     <div>
-      <strong>WorkPilot AI is working...</strong>
-      <p>Analysing your requirement and generating the work items.</p>
+      <strong>DevFlow AI is thinking...</strong>
+      <p>Understanding your request and contacting Azure DevOps.</p>
     </div>
   </div>
 }
+
+@if (chatError()) {
+  <div class="generation-notice generation-notice-error" role="alert">
+    <i class="pi pi-exclamation-circle"></i>
+    <span>{{ chatError() }}</span>
+  </div>
+}
+
+@if (chatResponse(); as response) {
+  <section class="chat-response">
+    <!-- AI response summary -->
+    <div class="response-summary">
+      <div class="response-icon">✦</div>
+
+      <div class="response-summary-content">
+        <div class="response-heading">
+          <strong>DevFlow AI</strong>
+          <span class="response-status">Completed</span>
+        </div>
+
+        <p>{{ response.agent_response }}</p>
+      </div>
+    </div>
+
+    <!-- Work item results -->
+    @if (response.tool_results?.length) {
+      <div class="results-header">
+        <div>
+          <h3>Work items</h3>
+          <p>Here are the results from Azure DevOps.</p>
+        </div>
+
+        <span class="results-count">
+          {{ response.tool_results.length }} results
+        </span>
+      </div>
+
+      <div class="work-item-grid">
+        @for (
+          item of response.tool_results.slice(0, visibleWorkItemCount());
+          track item.id
+        ) {
+          <article class="work-item-card">
+            <div class="work-item-top">
+              <span class="work-item-id">#{{ item.id }}</span>
+
+              <span
+                class="work-item-state"
+                [class.state-active]="item.state === 'Active'"
+                [class.state-done]="item.state === 'Done'"
+                [class.state-new]="item.state === 'New'"
+              >
+                {{ item.state }}
+              </span>
+            </div>
+
+            <h4>{{ item.title }}</h4>
+
+            <div class="work-item-meta">
+              <span class="type-label">{{ item.type }}</span>
+              <span class="meta-separator">·</span>
+              <span>
+                {{ item.assignedTo || 'Unassigned' }}
+              </span>
+            </div>
+
+            @if (item.url) {
+              <div class="work-item-footer">
+                <a [href]="item.url" target="_blank" rel="noopener noreferrer">
+                  Open in Azure DevOps ↗
+                </a>
+              </div>
+            }
+          </article>
+        }
+      </div>
+      @if (response.tool_results.length > visibleWorkItemCount()) {
+        <div class="show-more-container">
+          <button
+            type="button"
+            class="show-more-button"
+            (click)="showAllWorkItems(response.tool_results.length)"
+          >
+            Show all {{ response.tool_results.length }} work items
+            <span>↓</span>
+          </button>
+        </div>
+      }
+    }
+  </section>
+}
+
 <app-prompt-composer
   [promptText]="promptText"
   [samplePrompts]="samplePrompts"
- [isLoading]="isGeneratingBoard() || isPublishingBoard()"
+  [isLoading]="isChatLoading() || isGeneratingBoard() || isPublishingBoard()"
   title="What would you like to do?"
   description="Create, update, assign and manage Azure DevOps work items using natural language."
   placeholder="e.g. Create a user story, assign task #104 to Ravi, or show high-priority tasks..."
@@ -75,7 +135,6 @@
   (promptTextChange)="promptText = $event"
   (commandSubmitted)="submitPrompt()"
 ></app-prompt-composer>
-
 
 <section class="recent-section">
   <div class="section-heading">

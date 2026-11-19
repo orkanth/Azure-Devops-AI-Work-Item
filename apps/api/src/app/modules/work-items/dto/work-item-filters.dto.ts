@@ -1,5 +1,15 @@
+
 import { Transform, Type } from 'class-transformer';
-import { IsIn, IsInt, IsOptional, IsString, MaxLength, IsBoolean } from 'class-validator'; 
+import {
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class WorkItemFiltersDto {
   @IsOptional()
@@ -31,4 +41,31 @@ export class WorkItemFiltersDto {
   })
   @IsBoolean()
   is_assigned?: boolean;
+
+  // Pagination
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number = 1;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  pageSize?: number = 20;
+
+  // Sorting
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  sortBy?: string = 'id';
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.toUpperCase() : value,
+  )
+  @IsIn(['ASC', 'DESC'])
+  sortOrder?: 'ASC' | 'DESC' = 'DESC';
 }

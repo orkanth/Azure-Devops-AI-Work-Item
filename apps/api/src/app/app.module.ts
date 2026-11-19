@@ -9,6 +9,7 @@ import { DocumentsModule } from './modules/documents/documents.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm'; 
 import { UsersModule } from './modules/users/users.module';
+import { ChatModule } from './modules/chat/chat.module';
 @Module({
   imports: [
      ConfigModule.forRoot({
@@ -34,6 +35,7 @@ import { UsersModule } from './modules/users/users.module';
     GenerationModule,
     DocumentsModule,
     UsersModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -20,6 +20,10 @@ import {
   ApiService,
   PublishWorkItemsResponse,
 } from '../../../core/services/api.service';
+
+import { ChatService } from '../data-access/chat.service';
+import { environment } from '../../../../environments/environment';
+import { ChatResponse } from '../models/chat.model';
 @Component({
   selector: 'app-overview-page',
   standalone: true,
@@ -39,7 +43,14 @@ export class OverviewPageComponent {
   private readonly boardGenerationService = inject(BoardGenerationService);
   private readonly generatedBoardStore = inject(GeneratedBoardStore);
   private readonly apiService = inject(ApiService);
+  private readonly chatService = inject(ChatService);
 
+  readonly chatResponse = signal<ChatResponse | null>(null);
+  readonly isChatLoading = signal(false);
+  readonly chatError = signal<string | null>(null);
+
+  private conversationId: string = crypto.randomUUID();
+  readonly visibleWorkItemCount = signal(4);
   constructor() {
     effect(() => {
       const prompt = this.navigation.promptSeed();
@@ -74,36 +85,47 @@ export class OverviewPageComponent {
     this.navigation.requestEdit(item);
   }
   async submitPrompt(): Promise<void> {
+    this.visibleWorkItemCount.set(4);
     const prompt = this.promptText.trim();
 
-    console.log('Execute clicked:', prompt);
-
-    if (!prompt) {
-      console.warn('Prompt is empty');
-      return;
-    }
-
-    if (this.isGeneratingBoard()) {
-      console.warn('Generation already in progress');
+    if (!prompt || this.isChatLoading()) {
       return;
     }
 
     this.feedback.clear();
+    this.chatError.set(null);
+    this.chatResponse.set(null);
 
-    const isGeneration = this.isBoardGenerationRequest(prompt);
+    this.isChatLoading.set(true);
 
-    console.log('Board generation request:', isGeneration);
+    try {
+      const response = await firstValueFrom(
+        this.chatService.sendMessage({
+          question: prompt,
+          conversation_id: this.conversationId,
+          project_id: environment.projectId,
+        }),
+      );
 
-    if (isGeneration) {
-      await this.generateBoard(prompt);
-      return;
+      this.chatResponse.set(response);
+
+      // Preserve the conversation ID returned by the backend.
+      this.conversationId = response.conversation_id;
+
+      if (response.status === 'error') {
+        this.chatError.set(response.error ?? response.agent_response);
+      } else {
+        this.promptText = '';
+      }
+    } catch (error) {
+      console.error('Chat request failed:', error);
+
+      this.chatError.set(
+        'DevFlow AI could not process your request. Please try again.',
+      );
+    } finally {
+      this.isChatLoading.set(false);
     }
-
-    this.pendingProposal = this.promptService.interpret(prompt, this.items());
-
-    console.log('Command proposal:', this.pendingProposal);
-
-    this.deleteAcknowledged = false;
   }
   private isBoardGenerationRequest(prompt: string): boolean {
     return (
@@ -315,5 +337,9 @@ export class OverviewPageComponent {
     } finally {
       this.isPublishingBoard.set(false);
     }
+  }
+
+  showAllWorkItems(total: number): void {
+    this.visibleWorkItemCount.set(total);
   }
 }
