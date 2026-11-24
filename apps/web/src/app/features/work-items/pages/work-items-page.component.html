@@ -199,24 +199,16 @@
       <span>Fetching the latest data from Azure DevOps.</span>
     </div>
     <p-treetable
-      *ngIf="!isLoading() && treeNodes().length > 0; else noWorkItems"
-      class="work-items-tree"
-      [value]="treeNodes()"
-      [scrollable]="true"
-      [paginator]="true"
-      [first]="first()"
-      [rows]="pageSize()"
-      [rowsPerPageOptions]="[10, 20, 50]"
-      [showCurrentPageReport]="true"
-      currentPageReportTemplate="Showing {first} to {last} of {totalRecords} root items"
-      [alwaysShowPaginator]="false"
-      (onPage)="onPageChange($event)"
-      [tableStyle]="{
-        'min-width': '72rem',
-        width: '100%',
-        'table-layout': 'fixed',
-      }"
-    >
+  *ngIf="!isLoading() && treeNodes().length > 0; else noWorkItems"
+  class="work-items-tree"
+  [value]="treeNodes()"
+  [scrollable]="true"
+  [tableStyle]="{
+    'min-width': '72rem',
+    width: '100%',
+    'table-layout': 'fixed',
+  }"
+>
       <ng-template #header>
         <tr>
           <th class="tree-id-column" ttSortableColumn="id">
@@ -348,15 +340,10 @@
   </div>
 
   <div class="table-footer">
-    <span>
-      Showing {{ visibleTreeNodeCount() }} items in the hierarchy ({{
-        matchingItems().length
-      }}
-      matched · {{ items().length }} total)
-    </span>
-    <button *ngIf="supportsDemoReset" type="button" (click)="resetDemo()">
-      <i class="pi pi-refresh" aria-hidden="true"></i> Reset demo data
-    </button>
+     <span>
+    Showing {{ visibleTreeNodeCount() }} items in the hierarchy
+    ({{ matchingItems().length }} matched · {{ totalRecords() }} total)
+  </span> 
   </div>
 </section>
 

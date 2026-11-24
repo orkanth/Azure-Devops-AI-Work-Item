@@ -1,11 +1,17 @@
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import {
+  Component,
+  computed,
+  effect,
+  inject,
+  signal,
+  OnInit,
+} from '@angular/core';
 import { AppFeedbackService } from '../../../core/services/app-feedback.service';
-import { PromptCommandService } from '../../../core/services/prompt-command.service';
 import { WorkspaceNavigationService } from '../../../core/services/workspace-navigation.service';
 import { WorkItemTableComponent } from '../../../shared/components/work-item-table/work-item-table.component';
 import {
   PromptProposal,
-  WorkItem, 
+  WorkItem,
 } from '../../../shared/models/work-item.model';
 import { WORK_ITEM_STORE } from '../../work-items/data-access/work-item-store';
 import { OverviewStatsComponent } from '../components/overview-stats/overview-stats.component';
@@ -13,13 +19,16 @@ import { PromptComposerComponent } from '../components/prompt-composer/prompt-co
 import { BoardGenerationService } from '../../generator/data-access/board-generation.service';
 import { GeneratedBoardStore } from '../../work-items/data-access/generated-board.store';
 import { firstValueFrom } from 'rxjs';
-import {
-  ApiService, 
-} from '../../../core/services/api.service';
+import { ApiService } from '../../../core/services/api.service';
 
 import { ChatService } from '../data-access/chat.service';
 import { environment } from '../../../../environments/environment';
-import { ChatResponse } from '../models/chat.model';
+
+import {
+  ChatResponse,
+  GeneratedWorkItem,
+  PublishedWorkItem,
+} from '../models/chat.model';
 @Component({
   selector: 'app-overview-page',
   standalone: true,
@@ -31,8 +40,8 @@ import { ChatResponse } from '../models/chat.model';
   templateUrl: './overview-page.component.html',
   styleUrl: './overview-page.component.css',
 })
-export class OverviewPageComponent {
-  private readonly workItemStore = inject(WORK_ITEM_STORE); 
+export class OverviewPageComponent implements OnInit {
+  private readonly workItemStore = inject(WORK_ITEM_STORE);
   private readonly feedback = inject(AppFeedbackService);
   private readonly navigation = inject(WorkspaceNavigationService);
   private readonly boardGenerationService = inject(BoardGenerationService);
@@ -71,6 +80,17 @@ export class OverviewPageComponent {
   promptText = '';
   pendingProposal: PromptProposal | null = null;
   deleteAcknowledged = false;
+  ngOnInit(): void {
+    this.loadDashboardSummary();
+  }
+
+  private async loadDashboardSummary(): Promise<void> {
+    try {
+      await this.workItemStore.refreshSummary();
+    } catch (error) {
+      console.error('Failed to load dashboard summary:', error);
+    }
+  }
 
   navigateToWorkItems(): void {
     this.navigation.navigateTo('work-items');
@@ -79,6 +99,7 @@ export class OverviewPageComponent {
   startEdit(item: WorkItem): void {
     this.navigation.requestEdit(item);
   }
+
   async submitPrompt(): Promise<void> {
     this.visibleWorkItemCount.set(4);
     const prompt = this.promptText.trim();
@@ -90,7 +111,6 @@ export class OverviewPageComponent {
     this.feedback.clear();
     this.chatError.set(null);
     this.chatResponse.set(null);
-
     this.isChatLoading.set(true);
 
     try {
@@ -103,14 +123,27 @@ export class OverviewPageComponent {
       );
 
       this.chatResponse.set(response);
-
-      // Preserve the conversation ID returned by the backend.
       this.conversationId = response.conversation_id;
 
       if (response.status === 'error') {
         this.chatError.set(response.error ?? response.agent_response);
       } else {
         this.promptText = '';
+
+        // Refresh Recent work items after successful Azure DevOps publishing.
+        if (
+          response.intent === 'generation' &&
+          response.publishing_result?.success === true
+        ) {
+          try {
+            await this.workItemStore.refresh();
+          } catch (refreshError) {
+            console.error(
+              'Work items were published, but the recent items refresh failed:',
+              refreshError,
+            );
+          }
+        }
       }
     } catch (error) {
       console.error('Chat request failed:', error);
@@ -121,8 +154,7 @@ export class OverviewPageComponent {
     } finally {
       this.isChatLoading.set(false);
     }
-  } 
- 
+  }
 
   selectCandidate(item: WorkItem): void {
     const proposal = this.pendingProposal;
@@ -294,5 +326,18 @@ export class OverviewPageComponent {
 
   showAllWorkItems(total: number): void {
     this.visibleWorkItemCount.set(total);
+  }
+
+  getPublishedWorkItem(item: GeneratedWorkItem): PublishedWorkItem | undefined {
+    const createdItems = this.chatResponse()?.publishing_result?.created ?? [];
+
+    return createdItems.find(
+      (published) =>
+        published.title === item.title && published.type === item.type,
+    );
+  }
+
+  getAzureBoardsUrl(workItemId: number): string {
+    return `https://dev.azure.com/Koundeep/${environment.projectId}/_workitems/edit/${workItemId}`;
   }
 }

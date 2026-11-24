@@ -55,6 +55,65 @@
       </div>
     </div>
 
+    @if (response.proposal?.items?.length) {
+      <div class="results-header">
+        <div>
+          <h3>Generated work items</h3>
+          <p>AI-generated work items published to Azure DevOps</p>
+        </div>
+
+        <span class="results-count">
+          {{
+            response.publishing_result?.summary?.created ??
+              response.publishing_result?.created?.length ??
+              0
+          }}
+          created
+        </span>
+      </div>
+
+      <div class="work-item-grid">
+        @for (item of response.proposal.items; track $index) {
+          <article class="work-item-card">
+            <div class="work-item-top">
+              <span class="type-label">{{ item.type }}</span>
+
+              @if (getPublishedWorkItem(item); as published) {
+                <span class="work-item-id">#{{ published.id }}</span>
+              }
+            </div>
+
+            <h4>{{ item.title }}</h4>
+
+            @if (item.description) {
+              <p class="generated-description">
+                {{ item.description }}
+              </p>
+            } 
+
+            @if (getPublishedWorkItem(item); as published) {
+              <div class="work-item-footer">
+                @if (published.url) {
+                  <a
+                    [href]="getAzureBoardsUrl(published.id)"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Open in Azure DevOps
+                    <i class="pi pi-external-link"></i>
+                  </a>
+                } @else {
+                  <span class="work-item-id"
+                    >Published #{{ published.id }}</span
+                  >
+                }
+              </div>
+            }
+          </article>
+        }
+      </div>
+    }
+
     <!-- Work item results -->
     @if (response.tool_results?.length) {
       <div class="results-header">

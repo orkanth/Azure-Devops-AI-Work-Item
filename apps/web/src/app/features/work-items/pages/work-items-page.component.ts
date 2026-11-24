@@ -27,10 +27,10 @@ import {
 import { buildWorkItemTree } from '../utils/work-item-tree.util';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { WorkItemsQuery } from '../../../shared/models/work-items-query.model';
-import { PaginatorModule } from 'primeng/paginator';
+import { WorkItemsQuery } from '../../../shared/models/work-items-query.model'; 
 import { AiWorkItemProposalService } from '../data-access/ai-work-item-proposal.service';
 import type { AiEpicProposal } from '../models/ai-work-item-proposal.model';
+import { PaginatorModule } from 'primeng/paginator';
 @Component({
   selector: 'app-work-items-page',
   standalone: true,
@@ -38,6 +38,7 @@ import type { AiEpicProposal } from '../models/ai-work-item-proposal.model';
     CommonModule,
     FormsModule,
     TreeTableModule,
+    PaginatorModule,
     WorkItemEditDialogComponent,
   ],
   templateUrl: './work-items-page.component.html',
@@ -140,20 +141,8 @@ export class WorkItemsPageComponent implements OnInit {
   deleteAcknowledged = false;
 
   async ngOnInit(): Promise<void> {
-    this.isLoading.set(true);
-
-    try {
-      await this.workItemStore.refresh();
-    } catch (error) {
-      console.error('Failed to load Azure DevOps work items:', error);
-
-      this.feedback.show(
-        'Unable to load work items from Azure DevOps.',
-        'error',
-      );
-    } finally {
-      this.isLoading.set(false);
-    }
+    
+    await this.loadWorkItems();
   }
   startCreatePrompt(): void {
     this.navigation.navigateWithPrompt('Create a task for ');

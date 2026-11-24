@@ -40,7 +40,7 @@ export interface WorkItemStore {
   delete(id: number): Promise<void>;
 
   resetDemoData?(): void;
-
+  refreshSummary(): Promise<void>;
   getCounts(): WorkItemCounts;
 }
 

@@ -211,14 +211,12 @@ class GenerationAgent:
             "agent_response": agent_response,
         }
 
-
-async def __call__(
-    self,
-    state: dict[str, Any],
-) -> dict[str, Any]:
-
-    return await self.execute(
-        question=state.get("question", ""),
-        messages=state.get("messages", []),
-        project_id=state.get("project_id"),
-    )
+    async def __call__(
+        self,
+        state: dict[str, Any],
+    ) -> dict[str, Any]:
+        return await self.execute(
+            question=state.get("question", ""),
+            messages=state.get("messages", []),
+            project_id=state.get("project_id"),
+        )

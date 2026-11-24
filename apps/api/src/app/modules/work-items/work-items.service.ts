@@ -49,13 +49,23 @@ export class WorkItemsService {
   };
 
   constructor(private readonly azureDevOpsService: AzureDevOpsService) {}
-  async findAll(filters: WorkItemFilters = {}): Promise<WorkItemResponse[]> {
-    const [items, displayNames] = await Promise.all([
+
+  async findAll(filters: WorkItemFilters = {}) {
+    const [result, displayNames] = await Promise.all([
       this.azureDevOpsService.getWorkItems(filters),
       this.azureDevOpsService.getUserDisplayNames(),
     ]);
 
-    return items.map((item) => this.mapWorkItem(item, displayNames));
+    const items = result.items.map((item) =>
+      this.mapWorkItem(item, displayNames),
+    );
+
+    return {
+      items,
+      total: result.totalRecords,
+      page: result.page,
+      pageSize: result.pageSize,
+    };
   }
 
   private mapWorkItem(
@@ -651,5 +661,8 @@ export class WorkItemsService {
         `Work item ${workItem.id} does not belong to the configured project.`,
       );
     }
+  }
+  async getSummary() {
+    return this.azureDevOpsService.getWorkItemCounts();
   }
 }

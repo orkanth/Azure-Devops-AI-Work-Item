@@ -74,6 +74,12 @@ export interface PublishWorkItemsResponse {
     message: string;
   }>;
 }
+export interface ApiWorkItemSummary {
+  total: number;
+  active: number;
+  newItems: number;
+  completed: number;
+}
 
 @Injectable({
   providedIn: 'root',
@@ -135,6 +141,12 @@ export class ApiService {
     return this.http.post<PublishWorkItemsResponse>(
       `${this.baseUrl}/work-items/publish`,
       request,
+    );
+  }
+
+  getWorkItemSummary(): Observable<ApiWorkItemSummary> {
+    return this.http.get<ApiWorkItemSummary>(
+      `${this.baseUrl}/work-items/summary`,
     );
   }
 }

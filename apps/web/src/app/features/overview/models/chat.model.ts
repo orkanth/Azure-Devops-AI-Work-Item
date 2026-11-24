@@ -1,3 +1,4 @@
+
 export interface ChatRequest {
   question: string;
   conversation_id?: string;
@@ -19,6 +20,43 @@ export interface ChatWorkItem {
   url?: string;
 }
 
+// Work item returned by the AI generation proposal
+export interface GeneratedWorkItem {
+  title: string;
+  type: string;
+  description?: string;
+  acceptance_criteria?: string[];
+  children?: GeneratedWorkItem[];
+}
+
+// Work item successfully published to Azure DevOps
+export interface PublishedWorkItem {
+  id: number;
+  type: string;
+  title: string;
+  url?: string;
+}
+
+export interface PublishingSummary {
+  created: number;
+  reused: number;
+  failed: number;
+}
+
+export interface PublishingResult {
+  success?: boolean;
+  status?: string;
+  created?: PublishedWorkItem[];
+  reused?: PublishedWorkItem[];
+  summary?: PublishingSummary;
+  message?: string;
+}
+
+export interface GenerationProposal {
+  requested_type?: string;
+  items?: GeneratedWorkItem[];
+}
+
 export interface ChatResponse {
   conversation_id: string;
   status: 'success' | 'error' | 'completed' | 'clarification_required';
@@ -30,7 +68,7 @@ export interface ChatResponse {
   clarification_options: Array<Record<string, unknown>>;
   error?: string | null;
   work_item_intent?: string | null;
-  proposal?: Record<string, unknown> | null;
+  proposal?: GenerationProposal | null;
   publish_id?: string | null;
-  publishing_result?: Record<string, unknown> | null;
+  publishing_result?: PublishingResult | null;
 }

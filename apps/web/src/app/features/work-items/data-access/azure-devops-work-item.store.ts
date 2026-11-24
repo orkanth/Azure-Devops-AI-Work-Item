@@ -25,7 +25,12 @@ export class AzureDevOpsWorkItemStore implements WorkItemStore {
 
   readonly items = this._items.asReadonly();
   private readonly _totalRecords = signal(0);
-
+  private readonly _summary = signal<WorkItemCounts>({
+    total: 0,
+    active: 0,
+    newItems: 0,
+    completed: 0,
+  });
   readonly totalRecords = this._totalRecords.asReadonly();
   private currentQuery: WorkItemsQuery = {
     page: 1,
@@ -34,25 +39,37 @@ export class AzureDevOpsWorkItemStore implements WorkItemStore {
     sortOrder: 'DESC',
   };
 
-  async refresh(): Promise<void> {
-    const response = await firstValueFrom(
-      this.apiService.getWorkItems({
-        page: 1,
-        pageSize: 200,
-        sortBy: 'id',
-        sortOrder: 'DESC',
-      }),
-    );
 
-    if (!Array.isArray(response)) {
-      console.error('Unexpected API response:', response);
-      throw new Error('Invalid work items API response.');
-    }
+async refresh(query?: WorkItemsQuery): Promise<void> {
+  // Use the new query, or reuse the last query when refreshing.
+  const requestQuery = query ?? this.currentQuery;
 
-    this._items.set(response.map((item) => this.mapWorkItem(item)));
+  const response = await firstValueFrom(
+    this.apiService.getWorkItems(requestQuery),
+  );
 
-    this._totalRecords.set(response.length);
+  // Validate the paginated API response.
+  if (
+    !response ||
+    !Array.isArray(response.items) ||
+    typeof response.total !== 'number'
+  ) {
+    console.error('Unexpected API response:', response);
+    throw new Error('Invalid work items API response.');
   }
+
+  // Map the current page of API records to frontend models.
+  this._items.set(
+    response.items.map((item) => this.mapWorkItem(item)),
+  );
+
+  // Update the total number of matching records.
+  this._totalRecords.set(response.total);
+
+  // Remember the query for subsequent refresh operations.
+  this.currentQuery = { ...requestQuery };
+}
+
 
   async create(item: Omit<WorkItem, 'id' | 'updatedAt'>): Promise<WorkItem> {
     const payload: CreateApiWorkItemRequest = {
@@ -192,21 +209,12 @@ export class AzureDevOpsWorkItemStore implements WorkItemStore {
   findById(id: number): WorkItem | undefined {
     return this._items().find((item) => item.id === id);
   }
-
   getCounts(): WorkItemCounts {
-    const items = this._items();
+    return this._summary();
+  }
+  async refreshSummary(): Promise<void> {
+    const summary = await firstValueFrom(this.apiService.getWorkItemSummary());
 
-    return {
-      total: items.length,
-      active: items.filter((item) =>
-        ['active', 'in progress'].includes(item.state.toLowerCase()),
-      ).length,
-      newItems: items.filter((item) =>
-        ['new', 'to do'].includes(item.state.toLowerCase()),
-      ).length,
-      completed: items.filter((item) =>
-        ['resolved', 'closed', 'done'].includes(item.state.toLowerCase()),
-      ).length,
-    };
+    this._summary.set(summary);
   }
 }

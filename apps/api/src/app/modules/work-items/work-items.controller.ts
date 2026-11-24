@@ -60,6 +60,11 @@ export class WorkItemsController {
     return this.workItemsService.publish(dto);
   }
 
+  @Get('summary')
+  getSummary() {
+    return this.workItemsService.getSummary();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.workItemsService.findOne(Number(id));
