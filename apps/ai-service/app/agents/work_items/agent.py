@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from app.core.config import settings
 from app.tools.registry import get_all_tools
+from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +35,10 @@ class WorkItemRequest(BaseModel):
     state: str | None = None
     priority: int | None = None
     is_assigned: bool | None = None
+
+    # Support single and multiple work-item references.
     work_item_id: int | None = None
+    work_item_ids: list[int] = Field(default_factory=list)
 
 
 WORK_ITEM_SYSTEM_PROMPT = """
@@ -130,33 +134,57 @@ WORK ITEM ID EXTRACTION:
    
 WORK ITEM ASSIGNMENT:
 
-1. If the user asks to assign or reassign a work item,
+1. If the user asks to assign or reassign work items,
    use intent "assign".
 
-2. Extract the numeric work item ID into work_item_id.
+2. Extract ALL numeric work-item IDs into work_item_ids.
 
-3. If the target user is specified by display name,
+3. Preserve the order of the IDs specified by the user.
+
+4. For a single ID:
+   - Populate work_item_ids with that ID.
+   - Also populate work_item_id with the same ID.
+
+5. For multiple IDs:
+   - Populate work_item_ids with every ID.
+   - Set work_item_id to None.
+
+6. If the target user is specified by display name,
    extract it into assignee_name.
 
-4. If the target user is specified by email address,
+7. If the target user is specified by email address,
    extract it into assignee_email.
 
-5. Examples:
+8. Examples:
 
    "Assign item #153 to Ravi"
    - intent: assign
    - work_item_id: 153
+   - work_item_ids: [153]
+   - assignee_name: Ravi
+
+   "Assign #170 and #172 to Ravi"
+   - intent: assign
+   - work_item_id: None
+   - work_item_ids: [170, 172]
+   - assignee_name: Ravi
+
+   "Assign #170, #172 and #175 to Ravi"
+   - intent: assign
+   - work_item_ids: [170, 172, 175]
    - assignee_name: Ravi
 
    "Assign #153 to koundeep@gmail.com"
    - intent: assign
-   - work_item_id: 153
+   - work_item_ids: [153]
    - assignee_email: koundeep@gmail.com
 
-6. Never invent an ID or assignee.
+9. Never invent or omit a requested work-item ID.
 
-7. If the work item ID or assignee is missing,
-   request clarification.
+10. Never invent an assignee.
+
+11. If the work-item IDs or assignee are missing,
+    request clarification.
    
    
 WORK-ITEM EXTRACTION RULES:
@@ -199,6 +227,38 @@ WORK ITEM UPDATE RULES:
 5. Never treat a state-changing request as a list or search request.
 
 6. Never invent a work item ID or requested state.
+
+ASSIGNEE EMAIL EXTRACTION RULES:
+
+1. When the user provides an email address to identify an
+   assignee, extract it into assignee_email.
+
+2. Do not put an email address into assignee_name.
+
+3. Apply email extraction to listing, searching and filtering
+   requests, not only assignment requests.
+
+4. Examples:
+
+   "Show koundeep@gmail.com items"
+   - intent: list
+   - assignee_email: koundeep@gmail.com
+   - assignee_name: None
+   - is_assigned: None
+
+   "Show tasks assigned to ravi@example.com"
+   - intent: list
+   - assignee_email: ravi@example.com
+
+   "Show all assigned tasks"
+   - intent: list
+   - is_assigned: true
+   - assignee_email: None
+
+5. Never replace a specifically requested email filter
+   with is_assigned=true.
+
+6. Never invent or modify an email address.
 """
 
 
@@ -300,22 +360,30 @@ class WorkItemsAgent:
                 "work_items": [item],
             }
 
-            # Handle work-item assignment.
+        # Handle single and multiple work-item assignments.
         if request.intent == "assign":
 
-            if not request.work_item_id or request.work_item_id <= 0:
+            # Step 1: Collect work-item IDs.
+            work_item_ids = request.work_item_ids or (
+                [request.work_item_id] if request.work_item_id is not None else []
+            )
+
+            # Remove duplicates while preserving order.
+            work_item_ids = list(dict.fromkeys(work_item_ids))
+
+            if not work_item_ids or any(item_id <= 0 for item_id in work_item_ids):
                 return {
                     "status": "needs_clarification",
-                    "message": "Which work item should I assign?",
+                    "message": "Which work item or items should I assign?",
                 }
 
             if not request.assignee_name and not request.assignee_email:
                 return {
                     "status": "needs_clarification",
-                    "message": "Who should I assign this work item to?",
+                    "message": "Who should I assign these work items to?",
                 }
 
-            # Step 1: Resolve and verify the Azure DevOps user.
+            # Step 2: Resolve and verify the assignee once.
             assignee = await self._resolve_assignee(
                 assignee_name=request.assignee_name,
                 assignee_email=request.assignee_email,
@@ -325,59 +393,120 @@ class WorkItemsAgent:
                 return assignee
 
             verified_email = assignee["assignee_email"]
+            assignee_display_name = assignee["assignee_name"]
 
-            # Step 2: Execute the assignment.
-            assignment_result = await self._execute_tool(
-                self.assign_work_item_tool,
-                {
-                    "work_item_id": request.work_item_id,
-                    "assigned_to": verified_email,
-                },
-            )
+            successful_items = []
+            failed_items = []
 
-            if (
-                not isinstance(assignment_result, dict)
-                or assignment_result.get("status") == "error"
-            ):
-                return self._error_response(
-                    f"Failed to assign work item #{request.work_item_id}."
+            # Step 3: Assign and verify each work item.
+            for work_item_id in work_item_ids:
+
+                assignment_result = await self._execute_tool(
+                    self.assign_work_item_tool,
+                    {
+                        "work_item_id": work_item_id,
+                        "assigned_to": verified_email,
+                    },
                 )
 
-            # Step 3: Retrieve the item again to verify the assignment.
-            updated_item = await self._execute_tool(
-                self.get_work_item_by_id_tool,
-                {"work_item_id": request.work_item_id},
-            )
+                if (
+                    not isinstance(assignment_result, dict)
+                    or assignment_result.get("status") == "error"
+                ):
+                    error_message = (
+                        assignment_result.get("message", "Assignment failed.")
+                        if isinstance(assignment_result, dict)
+                        else "Unexpected assignment response."
+                    )
 
-            if not isinstance(updated_item, dict):
-                return self._error_response(
-                    "Assignment was submitted, but verification failed."
+                    failed_items.append(
+                        {
+                            "work_item_id": work_item_id,
+                            "message": error_message,
+                        }
+                    )
+                    continue
+
+                # Retrieve the item again to verify assignment.
+                updated_item = await self._execute_tool(
+                    self.get_work_item_by_id_tool,
+                    {"work_item_id": work_item_id},
                 )
 
-            actual_email = (
-                updated_item.get("assignedToEmail")
-                or updated_item.get("assignedTo")
-                or ""
-            )
+                if (
+                    not isinstance(updated_item, dict)
+                    or updated_item.get("status") == "error"
+                ):
+                    failed_items.append(
+                        {
+                            "work_item_id": work_item_id,
+                            "message": "Assignment submitted, but verification failed.",
+                        }
+                    )
+                    continue
 
-            if actual_email.strip().casefold() != verified_email.casefold():
-                return self._error_response(
-                    "Assignment could not be verified. "
-                    "Please check the work item in Azure DevOps."
+                actual_email = (
+                    updated_item.get("assignedToEmail")
+                    or updated_item.get("assignedTo")
+                    or ""
                 )
+
+                if actual_email.strip().casefold() != verified_email.casefold():
+                    failed_items.append(
+                        {
+                            "work_item_id": work_item_id,
+                            "message": "Assignment could not be verified.",
+                        }
+                    )
+                    continue
+
+                successful_items.append(updated_item)
+
+            # Step 4: Prepare the result.
+            success_count = len(successful_items)
+            total_count = len(work_item_ids)
+
+            success_details = [
+                f"#{item['id']} - {item.get('title', 'Untitled')}"
+                for item in successful_items
+            ]
+
+            failure_details = [
+                f"#{item['work_item_id']}: {item['message']}" for item in failed_items
+            ]
+
+            if failed_items:
+                message = (
+                    f"Assigned {success_count} of {total_count} work items "
+                    f"to {assignee_display_name}."
+                )
+
+                if success_details:
+                    message += "\nSuccessful: " + "; ".join(success_details)
+
+                message += "\nFailed: " + "; ".join(failure_details)
+
+                return {
+                    "status": "error",
+                    "intent": "assign",
+                    "assignee_name": assignee_display_name,
+                    "assignee_email": verified_email,
+                    "total": success_count,
+                    "work_items": successful_items,
+                    "failed_items": failed_items,
+                    "message": message,
+                }
 
             return {
                 "status": "success",
                 "intent": "assign",
-                "work_item_id": request.work_item_id,
-                "assignee_name": assignee["assignee_name"],
+                "assignee_name": assignee_display_name,
                 "assignee_email": verified_email,
-                "total": 1,
-                "work_items": [updated_item],
+                "total": success_count,
+                "work_items": successful_items,
                 "message": (
-                    f"Successfully assigned work item "
-                    f"#{request.work_item_id} to "
-                    f"{assignee['assignee_name']}."
+                    f"Successfully assigned {success_count} work items "
+                    f"to {assignee_display_name}: " + "; ".join(success_details)
                 ),
             }
         # Handle work-item updates.
@@ -461,60 +590,21 @@ class WorkItemsAgent:
         resolved_email = None
 
         # Step 3: Resolve a specifically requested assignee.
-        if request.assignee_name:
+        resolved_email = None
 
-            users = await self._execute_tool(
-                self.get_users_tool,
-                {"name": request.assignee_name},
+        if request.assignee_name or request.assignee_email:
+
+            assignee = await self._resolve_assignee(
+                assignee_name=request.assignee_name,
+                assignee_email=request.assignee_email,
             )
 
-            if not isinstance(users, list):
-                return self._error_response(
-                    "Azure DevOps user lookup failed. "
-                    "Work-item retrieval was blocked."
-                )
+            if assignee["status"] != "success":
+                return assignee
 
-            if len(users) == 0:
-                return {
-                    "status": "not_found",
-                    "message": (
-                        f"No Azure DevOps user matched " f"'{request.assignee_name}'."
-                    ),
-                }
+            resolved_email = assignee["assignee_email"]
 
-            if len(users) > 1:
-                return {
-                    "status": "needs_clarification",
-                    "message": (
-                        "Multiple Azure DevOps users matched. "
-                        "Please select the correct account."
-                    ),
-                    "users": [
-                        {
-                            "display_name": (
-                                user.get("displayName")
-                                or user.get("display_name")
-                                or user.get("name")
-                            ),
-                            "email": user.get("email"),
-                        }
-                        for user in users
-                    ],
-                }
-
-            # Exactly one match: use its verified email.
-            email = users[0].get("email")
-
-            if not isinstance(email, str) or not email.strip():
-                return self._error_response(
-                    "The matching Azure DevOps user does not have "
-                    "a valid email address. Work-item retrieval "
-                    "was blocked."
-                )
-
-            resolved_email = email.strip()
-
-        # Step 4: Add only the verified email to the filters.
+        # Step 4: Apply the verified email filter.
         if resolved_email:
             filters["assigned_to"] = resolved_email
 

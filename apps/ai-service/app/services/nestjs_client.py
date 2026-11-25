@@ -31,7 +31,7 @@ class NestJSClient:
 
         url = f"{settings.nestjs_api_url}/work-items"
 
-        params = {
+        base_params = {
             "type": type,
             "state": state,
             "assignedTo": assigned_to,
@@ -39,23 +39,62 @@ class NestJSClient:
             "is_assigned": is_assigned,
         }
 
-        params = {key: value for key, value in params.items() if value is not None}
+        base_params = {
+            key: value for key, value in base_params.items() if value is not None
+        }
+
+        page = 1
+        page_size = 200
+        all_items: list[dict] = []
 
         async with httpx.AsyncClient(timeout=30.0) as client:
-            response = await client.get(url, params=params)
-            response.raise_for_status()
 
-            data = response.json()
+            while True:
+                params = {
+                    **base_params,
+                    "page": page,
+                    "pageSize": page_size,
+                }
 
-            # Support the paginated NestJS API response.
-            if isinstance(data, dict) and isinstance(data.get("items"), list):
-                return data["items"]
+                response = await client.get(url, params=params)
+                response.raise_for_status()
 
-            # Maintain backward compatibility with list responses.
-            if isinstance(data, list):
-                return data
+                data = response.json()
 
-            raise ValueError("Unexpected work-items API response format.")
+                # Backward compatibility with the old list response.
+                if isinstance(data, list):
+                    return data
+
+                if not isinstance(data, dict) or not isinstance(
+                    data.get("items"), list
+                ):
+                    raise ValueError("Unexpected work-items API response format.")
+
+                page_items = data["items"]
+                total_records = data.get(
+                    "total",
+                    data.get("totalRecords"),
+                )
+
+                if not isinstance(total_records, int):
+                    raise ValueError(
+                        "Work-items API response is missing total records."
+                    )
+
+                all_items.extend(page_items)
+
+                # All matching records have been retrieved.
+                if len(all_items) >= total_records:
+                    break
+
+                if not page_items:
+                    raise ValueError(
+                        "Work-items API returned an incomplete paginated result."
+                    )
+
+                page += 1
+
+        return all_items
 
     async def get_work_item_by_id(self, work_item_id: int) -> dict:
         url = f"{settings.nestjs_api_url}/work-items/{work_item_id}"
