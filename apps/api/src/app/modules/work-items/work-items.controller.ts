@@ -34,7 +34,7 @@ export class WorkItemsController {
   }
 
   @Patch(':id')
-  update(
+  update( 
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateWorkItemDto,
   ) {

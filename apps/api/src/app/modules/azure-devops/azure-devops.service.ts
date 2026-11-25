@@ -96,170 +96,161 @@ export class AzureDevOpsService {
     return value.replace(/'/g, "''");
   }
 
- 
-async getWorkItems(
-  filters: WorkItemFilters = {},
-): Promise<AzureDevOpsWorkItemsPage> {
-  this.validateFilterValue(filters.type, 'Work item type');
-  this.validateFilterValue(filters.state, 'State');
-  this.validateFilterValue(filters.assignedTo, 'Assigned to');
+  async getWorkItems(
+    filters: WorkItemFilters = {},
+  ): Promise<AzureDevOpsWorkItemsPage> {
+    this.validateFilterValue(filters.type, 'Work item type');
+    this.validateFilterValue(filters.state, 'State');
+    this.validateFilterValue(filters.assignedTo, 'Assigned to');
 
-  const organization = this.getRequiredConfig('AZURE_DEVOPS_ORG');
-  const project = this.getRequiredConfig('AZURE_DEVOPS_PROJECT');
-  const token = this.getRequiredConfig('AZURE_DEVOPS_PAT');
+    const organization = this.getRequiredConfig('AZURE_DEVOPS_ORG');
+    const project = this.getRequiredConfig('AZURE_DEVOPS_PROJECT');
+    const token = this.getRequiredConfig('AZURE_DEVOPS_PAT');
 
-  const apiVersion =
-    this.config.get<string>('AZURE_DEVOPS_API_VERSION') || '7.1';
+    const apiVersion =
+      this.config.get<string>('AZURE_DEVOPS_API_VERSION') || '7.1';
 
-  const baseUrl =
-    `https://dev.azure.com/${encodeURIComponent(organization)}` +
-    `/${encodeURIComponent(project)}`;
+    const baseUrl =
+      `https://dev.azure.com/${encodeURIComponent(organization)}` +
+      `/${encodeURIComponent(project)}`;
 
-  const headers = {
-    Authorization: `Basic ${Buffer.from(`:${token}`).toString('base64')}`,
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
-  };
+    const headers = {
+      Authorization: `Basic ${Buffer.from(`:${token}`).toString('base64')}`,
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+    };
 
-  const page = Math.max(1, Number(filters.page) || 1);
-  const pageSize = Math.min(
-    200,
-    Math.max(1, Number(filters.pageSize) || 10),
-  );
+    const page = Math.max(1, Number(filters.page) || 1);
+    const pageSize = Math.min(200, Math.max(1, Number(filters.pageSize) || 10));
 
-  const offset = (page - 1) * pageSize;
+    const offset = (page - 1) * pageSize;
 
-  const sortOrder = filters.sortOrder === 'ASC' ? 'ASC' : 'DESC';
+    const sortOrder = filters.sortOrder === 'ASC' ? 'ASC' : 'DESC';
 
-  const conditions: string[] = [
-    '[System.TeamProject] = @project',
-  ];
+    const conditions: string[] = ['[System.TeamProject] = @project'];
 
-  if (
-    filters.priority !== undefined &&
-    ![1, 2, 3, 4].includes(filters.priority)
-  ) {
-    throw new BadRequestException('Priority must be between 1 and 4.');
-  }
+    if (
+      filters.priority !== undefined &&
+      ![1, 2, 3, 4].includes(filters.priority)
+    ) {
+      throw new BadRequestException('Priority must be between 1 and 4.');
+    }
 
-  if (filters.type) {
-    conditions.push(
-      `[System.WorkItemType] = '${this.escapeWiqlValue(filters.type)}'`,
-    );
-  }
-
-  if (filters.state) {
-    conditions.push(
-      `[System.State] = '${this.escapeWiqlValue(filters.state)}'`,
-    );
-  }
-
-  if (filters.assignedTo) {
-    conditions.push(
-      `[System.AssignedTo] = '${this.escapeWiqlValue(filters.assignedTo)}'`,
-    );
-  }
-
-  if (filters.priority !== undefined) {
-    if (filters.priority === 1 || filters.priority === 2) {
-      conditions.push('[Microsoft.VSTS.Common.Priority] IN (1, 2)');
-    } else {
+    if (filters.type) {
       conditions.push(
-        `[Microsoft.VSTS.Common.Priority] = ${filters.priority}`,
+        `[System.WorkItemType] = '${this.escapeWiqlValue(filters.type)}'`,
       );
     }
-  }
 
-  if (filters.is_assigned === true) {
-    conditions.push("[System.AssignedTo] <> ''");
-  }
+    if (filters.state) {
+      conditions.push(
+        `[System.State] = '${this.escapeWiqlValue(filters.state)}'`,
+      );
+    }
 
-  if (filters.is_assigned === false) {
-    conditions.push("[System.AssignedTo] = ''");
-  }
+    if (filters.assignedTo) {
+      conditions.push(
+        `[System.AssignedTo] = '${this.escapeWiqlValue(filters.assignedTo)}'`,
+      );
+    }
 
-  if (filters.is_assigned === false && filters.assignedTo) {
-    throw new BadRequestException(
-      'Cannot filter by a specific assignee when is_assigned is false.',
-    );
-  }
+    if (filters.priority !== undefined) {
+      if (filters.priority === 1 || filters.priority === 2) {
+        conditions.push('[Microsoft.VSTS.Common.Priority] IN (1, 2)');
+      } else {
+        conditions.push(
+          `[Microsoft.VSTS.Common.Priority] = ${filters.priority}`,
+        );
+      }
+    }
 
-  const queryParams = new URLSearchParams({
-    $top: '20000',
-    'api-version': apiVersion,
-  });
+    if (filters.is_assigned === true) {
+      conditions.push("[System.AssignedTo] <> ''");
+    }
 
-  const queryUrl =
-    `${baseUrl}/_apis/wit/wiql?${queryParams.toString()}`;
+    if (filters.is_assigned === false) {
+      conditions.push("[System.AssignedTo] = ''");
+    }
 
-  const queryResult = await this.requestJson<WiqlQueryResponse>(
-    queryUrl,
-    headers,
-    {
-      method: 'POST',
-      body: JSON.stringify({
-        query: `
+    if (filters.is_assigned === false && filters.assignedTo) {
+      throw new BadRequestException(
+        'Cannot filter by a specific assignee when is_assigned is false.',
+      );
+    }
+
+    const queryParams = new URLSearchParams({
+      $top: '20000',
+      'api-version': apiVersion,
+    });
+
+    const queryUrl = `${baseUrl}/_apis/wit/wiql?${queryParams.toString()}`;
+
+    const queryResult = await this.requestJson<WiqlQueryResponse>(
+      queryUrl,
+      headers,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          query: `
           SELECT [System.Id]
           FROM WorkItems
           WHERE ${conditions.join(' AND ')}
           ORDER BY [System.Id] ${sortOrder}
         `,
-      }),
-    },
-  );
+        }),
+      },
+    );
 
-  const allIds = [
-    ...new Set(
-      (queryResult.workItems ?? [])
-        .map((item) => item.id)
-        .filter((id) => Number.isInteger(id) && id > 0),
-    ),
-  ];
+    const allIds = [
+      ...new Set(
+        (queryResult.workItems ?? [])
+          .map((item) => item.id)
+          .filter((id) => Number.isInteger(id) && id > 0),
+      ),
+    ];
 
-  const totalRecords = allIds.length;
+    const totalRecords = allIds.length;
 
-  const pageIds = allIds.slice(offset, offset + pageSize);
+    const pageIds = allIds.slice(offset, offset + pageSize);
 
-  if (pageIds.length === 0) {
+    if (pageIds.length === 0) {
+      return {
+        items: [],
+        totalRecords,
+        page,
+        pageSize,
+      };
+    }
+
+    const itemParams = new URLSearchParams({
+      ids: pageIds.join(','),
+      $expand: 'relations',
+      'api-version': apiVersion,
+    });
+
+    const itemsUrl = `${baseUrl}/_apis/wit/workitems?${itemParams.toString()}`;
+
+    const response = await this.requestJson<WorkItemsResponse>(
+      itemsUrl,
+      headers,
+      { method: 'GET' },
+    );
+
+    const itemsById = new Map(
+      (response.value ?? []).map((item) => [item.id, item]),
+    );
+
+    const items = pageIds
+      .map((id) => itemsById.get(id))
+      .filter((item): item is AzureDevOpsWorkItem => item !== undefined);
+
     return {
-      items: [],
+      items,
       totalRecords,
       page,
       pageSize,
     };
   }
-
-  const itemParams = new URLSearchParams({
-    ids: pageIds.join(','),
-    $expand: 'relations',
-    'api-version': apiVersion,
-  });
-
-  const itemsUrl =
-    `${baseUrl}/_apis/wit/workitems?${itemParams.toString()}`;
-
-  const response = await this.requestJson<WorkItemsResponse>(
-    itemsUrl,
-    headers,
-    { method: 'GET' },
-  );
-
-  const itemsById = new Map(
-    (response.value ?? []).map((item) => [item.id, item]),
-  );
-
-  const items = pageIds
-    .map((id) => itemsById.get(id))
-    .filter((item): item is AzureDevOpsWorkItem => item !== undefined);
-
-  return {
-    items,
-    totalRecords,
-    page,
-    pageSize,
-  };
-}
-
 
   private getRequiredConfig(name: string): string {
     const value = this.config.get<string>(name)?.trim();
@@ -311,10 +302,25 @@ async getWorkItems(
         );
       }
 
-      throw new BadGatewayException(
-        `Azure DevOps returned HTTP ${response.status}. ` +
-          'Check the NestJS terminal for details.',
-      );
+      let errorMessage = `Azure DevOps returned HTTP ${response.status}.`;
+
+      try {
+        const errorData = JSON.parse(responseBody);
+
+        errorMessage =
+          errorData.customProperties?.RuleValidationErrors?.[0]?.errorMessage ||
+          errorData.customProperties?.ErrorMessage ||
+          errorData.message ||
+          errorMessage;
+      } catch {
+        // Retain the fallback error message.
+      }
+
+      if (response.status === 400) {
+        throw new BadRequestException(errorMessage);
+      }
+
+      throw new BadGatewayException(errorMessage);
     }
 
     if (!responseBody.trim()) {
@@ -800,6 +806,41 @@ async getWorkItems(
     }
   }
 
+  async getWorkItemTypeStates(workItemType: string): Promise<string[]> {
+    const organization = this.getRequiredConfig('AZURE_DEVOPS_ORG');
+    const project = this.getRequiredConfig('AZURE_DEVOPS_PROJECT');
+    const token = this.getRequiredConfig('AZURE_DEVOPS_PAT');
+
+    const apiVersion =
+      this.config.get<string>('AZURE_DEVOPS_API_VERSION') || '7.1';
+
+    const baseUrl =
+      `https://dev.azure.com/${encodeURIComponent(organization)}` +
+      `/${encodeURIComponent(project)}`;
+
+    const url =
+      `${baseUrl}/_apis/wit/workitemtypes/` +
+      `${encodeURIComponent(workItemType)}/states?` +
+      new URLSearchParams({
+        'api-version': apiVersion,
+      }).toString();
+
+    const headers = {
+      Authorization: `Basic ${Buffer.from(`:${token}`).toString('base64')}`,
+      Accept: 'application/json',
+    };
+
+    const response = await this.requestJson<{
+      value: Array<{
+        name: string;
+        category: string;
+      }>;
+    }>(url, headers, {
+      method: 'GET',
+    });
+
+    return response.value.map((state) => state.name);
+  }
   async findWorkItemsByTitle(title: string): Promise<AzureDevOpsWorkItem[]> {
     const searchTitle = title.trim();
 

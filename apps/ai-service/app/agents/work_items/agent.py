@@ -24,6 +24,7 @@ class WorkItemRequest(BaseModel):
         "search",
         "get_by_id",
         "assign",
+        "update",
         "other",
     ]
 
@@ -173,6 +174,31 @@ WORK-ITEM EXTRACTION RULES:
 7. Extract whether the user wants assigned or unassigned items.
 8. Do not invent filters that the user did not specify.
 9. Return only the requested structured information.
+
+WORK ITEM UPDATE RULES:
+
+1. If the user asks to move, change, update, set or mark
+   a work item, use intent "update".
+
+2. Extract the numeric work item ID into work_item_id.
+
+3. Extract the requested new state into state.
+
+4. Examples:
+
+   "Move #161 to Done"
+   - intent: update
+   - work_item_id: 161
+   - state: Done
+
+   "Move #160 to Resolved"
+   - intent: update
+   - work_item_id: 160
+   - state: Resolved
+
+5. Never treat a state-changing request as a list or search request.
+
+6. Never invent a work item ID or requested state.
 """
 
 
@@ -354,6 +380,57 @@ class WorkItemsAgent:
                     f"{assignee['assignee_name']}."
                 ),
             }
+        # Handle work-item updates.
+        if request.intent == "update":
+
+            if request.work_item_id is None or request.work_item_id <= 0:
+                return {
+                    "status": "needs_clarification",
+                    "message": "Which work item should I update?",
+                }
+
+            if not request.state or not request.state.strip():
+                return {
+                    "status": "needs_clarification",
+                    "message": "What state should I set for this work item?",
+                }
+
+            if self.update_work_item_tool is None:
+                return self._error_response(
+                    "The work-item update tool is not registered."
+                )
+
+            updated_item = await self._execute_tool(
+                self.update_work_item_tool,
+                {
+                    "work_item_id": request.work_item_id,
+                    "updates": {
+                        "state": request.state.strip(),
+                    },
+                },
+            )
+
+            if (
+                not isinstance(updated_item, dict)
+                or updated_item.get("status") == "error"
+            ):
+                return self._error_response(
+                    f"Failed to update work item #{request.work_item_id}."
+                )
+
+            return {
+                "status": "success",
+                "intent": "update",
+                "work_item_id": request.work_item_id,
+                "state": request.state.strip(),
+                "total": 1,
+                "work_items": [updated_item],
+                "message": (
+                    f"Successfully updated work item "
+                    f"#{request.work_item_id} to {request.state}."
+                ),
+            }
+
         # Step 2: Build filters from structured LLM output.
         filters = {
             "type": request.work_item_type,
@@ -545,6 +622,11 @@ class WorkItemsAgent:
                 response = result.get(
                     "message",
                     "Work item assignment completed.",
+                )
+            elif intent == "update":
+                response = result.get(
+                    "message",
+                    "Work item updated successfully.",
                 )
 
             else:

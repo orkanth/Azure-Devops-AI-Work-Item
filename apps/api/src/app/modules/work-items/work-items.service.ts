@@ -169,10 +169,50 @@ export class WorkItemsService {
   }
 
   async update(id: number, dto: UpdateWorkItemDto): Promise<WorkItemResponse> {
+    // Validate state only when the request includes a state change.
+    if (dto.state !== undefined) {
+      const existingItem = await this.azureDevOpsService.getWorkItemById(id);
+
+      if (!existingItem) {
+        throw new NotFoundException(`Work item ${id} not found.`);
+      }
+
+      // Identify the existing work-item type.
+      const workItemType = existingItem.fields['System.WorkItemType'];
+
+      if (typeof workItemType !== 'string' || !workItemType.trim()) {
+        throw new BadRequestException(
+          `Unable to determine the type of work item ${id}.`,
+        );
+      }
+
+      // Retrieve allowed states dynamically from Azure DevOps.
+      const allowedStates =
+        await this.azureDevOpsService.getWorkItemTypeStates(workItemType);
+
+      const requestedState = dto.state.trim();
+
+      // Match case-insensitively, but use the official Azure DevOps value.
+      const matchedState = allowedStates.find(
+        (state) => state.toLowerCase() === requestedState.toLowerCase(),
+      );
+
+      if (!matchedState) {
+        throw new BadRequestException(
+          `State '${requestedState}' is invalid for ${workItemType}. ` +
+            `Allowed states: ${allowedStates.join(', ')}.`,
+        );
+      }
+
+      dto = {
+        ...dto,
+        state: matchedState,
+      };
+    }
+
+    // Execute the existing Azure DevOps update.
     const updatedItem = await this.azureDevOpsService.updateWorkItem(id, dto);
 
-    // Identity lookup is supplementary; don't fail an update
-    // just because the Graph user lookup is temporarily unavailable.
     const displayNames = await this.azureDevOpsService
       .getUserDisplayNames()
       .catch(() => new Map<string, string>());

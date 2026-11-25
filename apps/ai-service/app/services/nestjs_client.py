@@ -45,7 +45,17 @@ class NestJSClient:
             response = await client.get(url, params=params)
             response.raise_for_status()
 
-            return response.json()
+            data = response.json()
+
+            # Support the paginated NestJS API response.
+            if isinstance(data, dict) and isinstance(data.get("items"), list):
+                return data["items"]
+
+            # Maintain backward compatibility with list responses.
+            if isinstance(data, list):
+                return data
+
+            raise ValueError("Unexpected work-items API response format.")
 
     async def get_work_item_by_id(self, work_item_id: int) -> dict:
         url = f"{settings.nestjs_api_url}/work-items/{work_item_id}"

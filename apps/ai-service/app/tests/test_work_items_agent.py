@@ -43,9 +43,22 @@ async def test_work_items_agent_receives_conversation_history():
     get_work_items_tool.name = "get_work_items"
     get_work_items_tool.ainvoke = AsyncMock(return_value=[])
 
+    get_work_item_by_id_tool = MagicMock()
+    get_work_item_by_id_tool.name = "get_work_item_by_id"
+    get_work_item_by_id_tool.ainvoke = AsyncMock(return_value={})
+
+    assign_work_item_tool = MagicMock()
+    assign_work_item_tool.name = "assign_work_item"
+    assign_work_item_tool.ainvoke = AsyncMock(return_value={"status": "success"})
+
     agent = WorkItemsAgent(
         llm=llm,
-        tools=[get_users_tool, get_work_items_tool],
+        tools=[
+            get_users_tool,
+            get_work_items_tool,
+            get_work_item_by_id_tool,
+            assign_work_item_tool,
+        ],
     )
 
     history = [
