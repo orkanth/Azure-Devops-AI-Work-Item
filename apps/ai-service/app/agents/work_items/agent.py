@@ -414,10 +414,27 @@ class WorkItemsAgent:
                 not isinstance(updated_item, dict)
                 or updated_item.get("status") == "error"
             ):
-                return self._error_response(
-                    f"Failed to update work item #{request.work_item_id}."
+                error_message = (
+                    updated_item.get("message", "Unknown update error.")
+                    if isinstance(updated_item, dict)
+                    else "Unexpected response from update tool."
                 )
 
+                if (
+                    isinstance(updated_item, dict)
+                    and updated_item.get("status_code") == 400
+                    and "Allowed states:" in error_message
+                ):
+                    return {
+                        "status": "needs_clarification",
+                        "intent": "update",
+                        "work_item_id": request.work_item_id,
+                        "message": (
+                            f"{error_message} " "Which state would you like to use?"
+                        ),
+                    }
+
+                return self._error_response(error_message)
             return {
                 "status": "success",
                 "intent": "update",
@@ -651,21 +668,46 @@ class WorkItemsAgent:
         }
 
     @staticmethod
-    async def _execute_tool(tool, arguments: dict[str, Any]) -> Any:
-        """Execute a LangChain tool and preserve execution failures."""
+    async def _execute_tool(
+        tool,
+        arguments: dict[str, Any],
+    ) -> Any:
+        """Execute a LangChain tool and preserve API error details."""
 
         try:
             return await tool.ainvoke(arguments)
 
-        except Exception:
+        except Exception as exc:
             logger.exception(
                 "Tool execution failed: %s",
                 tool.name,
             )
 
+            response = getattr(exc, "response", None)
+            status_code = getattr(response, "status_code", None)
+
+            error_message = None
+
+            if response is not None:
+                try:
+                    error_data = response.json()
+
+                    if isinstance(error_data, dict):
+                        error_message = error_data.get("message")
+
+                        if isinstance(error_message, list):
+                            error_message = " ".join(error_message)
+
+                except Exception:
+                    logger.warning(
+                        "Could not parse error response from tool: %s",
+                        tool.name,
+                    )
+
             return {
                 "status": "error",
-                "message": f"Tool '{tool.name}' execution failed.",
+                "status_code": status_code,
+                "message": (error_message or f"Tool '{tool.name}' execution failed."),
             }
 
     @staticmethod
